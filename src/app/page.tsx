@@ -46,7 +46,7 @@ export default function Home() {
           <section>
             <div className="flex items-center justify-between mb-3 px-1">
               <h2 className="text-sm font-semibold text-gray-500">이번 주 일정</h2>
-              <button className="text-xs text-blue-600 font-medium hover:underline">전체보기</button>
+              <Link href="/calendar" className="text-xs text-blue-600 font-medium hover:underline">전체보기</Link>
             </div>
             <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
               <div className="flex justify-between items-center mb-4">
@@ -108,7 +108,7 @@ export default function Home() {
                 <ChevronRight className="text-gray-400 group-hover:text-blue-500 transition-colors" />
               </Link>
               
-              <button className="w-full flex items-center justify-between p-4 rounded-2xl bg-white border border-gray-200 shadow-sm hover:border-blue-500 hover:shadow-md transition-all group">
+              <Link href="/tasks" className="w-full flex items-center justify-between p-4 rounded-2xl bg-white border border-gray-200 shadow-sm hover:border-blue-500 hover:shadow-md transition-all group">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
                     <CalendarClock size={20} />
@@ -119,7 +119,7 @@ export default function Home() {
                   </div>
                 </div>
                 <ChevronRight className="text-gray-400 group-hover:text-blue-500 transition-colors" />
-              </button>
+              </Link>
             </div>
           </section>
 

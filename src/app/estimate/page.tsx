@@ -13,6 +13,12 @@ type CheckBoxProp = {
 function Checkbox({ label, checked, onChange }: CheckBoxProp) {
   return (
     <label className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-xl cursor-pointer hover:border-blue-300 transition-colors">
+      <input 
+        type="checkbox" 
+        className="hidden" 
+        checked={checked} 
+        onChange={onChange}
+      />
       <div className={`flex-shrink-0 w-5 h-5 rounded flex items-center justify-center transition-colors ${checked ? 'bg-blue-600 border-blue-600' : 'border-2 border-gray-300'}`}>
         {checked && <CheckCircle2 size={14} className="text-white" />}
       </div>

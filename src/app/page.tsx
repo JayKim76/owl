@@ -1,5 +1,6 @@
-import { Wrench, PhoneCall, CalendarClock, Briefcase, FileText, ChevronRight, Settings, Users, ArrowRight } from "lucide-react";
+import { Wrench, PhoneCall, CalendarClock, Briefcase, FileText, ChevronRight, Settings, Users, ArrowRight, UserPlus } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function Home() {
   return (
@@ -7,9 +8,15 @@ export default function Home() {
       <main className="flex flex-col w-full max-w-md bg-white min-h-screen sm:min-h-full sm:rounded-3xl sm:overflow-hidden sm:shadow-2xl">
         {/* Header */}
         <header className="flex items-center justify-between px-6 py-5 bg-blue-900 text-white shadow-md">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 flex items-center justify-center rounded-full bg-yellow-400 text-blue-900 font-bold">
-              🦉
+           <div className="flex items-center gap-3">
+            <div className="w-10 h-10 flex items-center justify-center rounded-full bg-white overflow-hidden shadow-inner">
+              <Image
+                src="/owl-logo.png"
+                alt="부엉이누수탐지랩 로고"
+                width={36}
+                height={36}
+                className="object-contain"
+              />
             </div>
             <h1 className="text-xl font-bold tracking-tight">부엉이누수탐지랩</h1>
           </div>
@@ -120,6 +127,19 @@ export default function Home() {
                 </div>
                 <ChevronRight className="text-gray-400 group-hover:text-blue-500 transition-colors" />
               </Link>
+
+              <Link href="/customers" className="w-full flex items-center justify-between p-4 rounded-2xl bg-white border border-gray-200 shadow-sm hover:border-blue-500 hover:shadow-md transition-all group">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                    <UserPlus size={20} />
+                  </div>
+                  <div className="text-left">
+                    <h3 className="font-semibold text-gray-800">고객 등록 / 배정</h3>
+                    <p className="text-xs text-gray-500 mt-1">고객 등록 시 지역 협력사 자동 알림 발송</p>
+                  </div>
+                </div>
+                <ChevronRight className="text-gray-400 group-hover:text-blue-500 transition-colors" />
+              </Link>
             </div>
           </section>
 
@@ -134,10 +154,10 @@ export default function Home() {
                 <p className="text-xs text-slate-300 mb-2 leading-relaxed">
                   방수, 인테리어 복구 파트너라면 전용 관리 화면으로 로그인 해주세요.
                 </p>
-                <button className="max-w-fit flex items-center gap-1 text-sm font-semibold text-yellow-400 hover:text-yellow-300 transition-colors mt-1">
-                  파트너 로그인 이동
+                <Link href="/partners" className="max-w-fit flex items-center gap-1 text-sm font-semibold text-yellow-400 hover:text-yellow-300 transition-colors mt-1">
+                  협력사 포털 바로가기
                   <ArrowRight size={14} />
-                </button>
+                </Link>
               </div>
               <div className="absolute -bottom-6 -right-6 w-32 h-32 bg-slate-800 rounded-full opacity-50"></div>
               <div className="absolute top-4 right-4 text-slate-700 opacity-20">

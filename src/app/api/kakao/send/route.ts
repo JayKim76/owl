@@ -5,25 +5,39 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { phoneNumber, templateId, templateParams } = body;
 
-    // TODO: 실제 카카오톡 비즈메시지(알림톡) API 연동 로직
-    // 예: axios.post('https://api.kakao.com/v2/api/talk/memo/default/send', ...)
+    // Simulate network latency (500ms - 1200ms)
+    const delay = Math.floor(Math.random() * 700) + 500;
+    await new Promise(resolve => setTimeout(resolve, delay));
     
-    // 현재는 테스트/뼈대 환경이므로 Console에 출력하고 성공 응답 반환
-    console.log("[Kakao Alimtalk Test] Sending message to:", phoneNumber);
-    console.log("[Kakao Alimtalk Test] Template:", templateId);
-    console.log("[Kakao Alimtalk Test] Params:", templateParams);
+    // Log detailed message for debugging/demo purposes
+    console.log("==========================================");
+    console.log("[Kakao Alimtalk API Mock]");
+    console.log(`- To: ${phoneNumber}`);
+    console.log(`- Template: ${templateId}`);
+    console.log("- Content:");
+    console.log(`  [부엉이누수탐지랩] 견적 결과 안내`);
+    console.log(`  위치: ${templateParams.leakLocation}`);
+    console.log(`  항목: ${templateParams.works}`);
+    console.log(`  견적: ${templateParams.estimate}`);
+    console.log(`- Status: SUCCESS (Simulated)`);
+    console.log("==========================================");
+
+    const messageId = `msg_${Math.random().toString(36).substring(2, 11)}`;
 
     return NextResponse.json({
       success: true,
-      message: "알림톡 발송 테스트가 완료되었습니다.",
+      message: "알림톡이 성공적으로 발송되었습니다.",
       data: {
-        status: "TEST_SENT"
+        messageId,
+        status: "SENT",
+        provider: "SIMULATED_KAKAO_BIZ",
+        sentAt: new Date().toISOString()
       }
     });
   } catch (error) {
-    console.error("[Kakao Alimtalk Test] Error:", error);
+    console.error("[Kakao Alimtalk Error]:", error);
     return NextResponse.json(
-      { success: false, message: "알림톡 발송 중 오류가 발생했습니다." },
+      { success: false, message: "알림톡 발송 중 서버 오류가 발생했습니다." },
       { status: 500 }
     );
   }

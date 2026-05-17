@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, Calculator, Send, CheckCircle2, CheckSquare, Square, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, Calculator, Send, CheckCircle2, CheckSquare, Square, ChevronDown, ChevronUp, Settings } from "lucide-react";
 
 type CheckBoxProp = {
   label: string;
@@ -26,6 +26,17 @@ function Checkbox({ label, checked, onChange }: CheckBoxProp) {
     </label>
   );
 }
+
+// 🦉 기본 단가 초기값 상수 정의
+const INITIAL_DEFAULT_COSTS: Record<string, number> = {
+  "상수도 배관": 200000,
+  "하수도 배관": 250000,
+  "부분 철거": 150000,
+  "미장/방통": 200000,
+  "타일 마감": 300000,
+  "마루/바닥 복구": 400000,
+  "특수 방수": 500000
+};
 
 export default function EstimateChecklistPage() {
   // 1. 기본 정보
@@ -62,16 +73,21 @@ export default function EstimateChecklistPage() {
   const [isDetectOpen, setIsDetectOpen] = useState(false);
   const [customDetectItem, setCustomDetectItem] = useState<string>("");
 
-  // 4. 필요 작업 내용 (이 부분으로 견적 계산)
+  // 🦉 단가 설정용 상태 관리 레이어 정의
+  const [currentCosts, setCurrentCosts] = useState<Record<string, number>>(INITIAL_DEFAULT_COSTS);
+  const [settingsCosts, setSettingsCosts] = useState<Record<string, number>>(INITIAL_DEFAULT_COSTS);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // 4. 필요 작업 내용 (이 부분으로 견적 계산 - 최신 수정 단가가 동적으로 풀링됨)
   const [requiredWorks, setRequiredWorks] = useState<string[]>([]);
   const workOptions = [
-    { name: "상수도 배관", cost: 200000 },
-    { name: "하수도 배관", cost: 250000 },
-    { name: "부분 철거", cost: 150000 },
-    { name: "미장/방통", cost: 200000 },
-    { name: "타일 마감", cost: 300000 },
-    { name: "마루/바닥 복구", cost: 400000 },
-    { name: "특수 방수", cost: 500000 }
+    { name: "상수도 배관", cost: currentCosts["상수도 배관"] ?? 200000 },
+    { name: "하수도 배관", cost: currentCosts["하수도 배관"] ?? 250000 },
+    { name: "부분 철거", cost: currentCosts["부분 철거"] ?? 150000 },
+    { name: "미장/방통", cost: currentCosts["미장/방통"] ?? 200000 },
+    { name: "타일 마감", cost: currentCosts["타일 마감"] ?? 300000 },
+    { name: "마루/바닥 복구", cost: currentCosts["마루/바닥 복구"] ?? 400000 },
+    { name: "특수 방수", cost: currentCosts["특수 방수"] ?? 500000 }
   ];
 
   const [estimatedPrice, setEstimatedPrice] = useState<string | null>(null);
@@ -80,6 +96,105 @@ export default function EstimateChecklistPage() {
   const [detectionDetails, setDetectionDetails] = useState<string>("");
   const [isSending, setIsSending] = useState(false);
   const [sendSuccess, setSendSuccess] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      // 🦉 로컬 스토리지에 기설정된 사용자 정의 기본 단가가 있다면 로드하여 연동
+      const storedDefaults = localStorage.getItem("owl_default_costs");
+      let activeDefaults = INITIAL_DEFAULT_COSTS;
+      if (storedDefaults) {
+        try {
+          const parsed = JSON.parse(storedDefaults);
+          if (parsed && typeof parsed === "object") {
+            activeDefaults = { ...INITIAL_DEFAULT_COSTS, ...parsed };
+          }
+        } catch (e) {
+          console.error("Failed to parse stored defaults:", e);
+        }
+      }
+      setCurrentCosts(activeDefaults);
+      setSettingsCosts(activeDefaults);
+
+      const params = new URLSearchParams(window.location.search);
+      const leakLocation = params.get("leakLocation");
+      const urgency = params.get("urgency");
+      const boilerBrand = params.get("boilerBrand");
+      const boilerError = params.get("boilerError");
+      const boilerPipeSize = params.get("boilerPipeSize");
+      const elevator = params.get("elevator") === "true";
+      const parking = params.get("parking") === "true";
+      const heatingTarget = params.get("heatingTarget");
+      const detectChecksParam = params.get("detectChecks");
+      
+      const newBasicInfo = { ...basicInfo };
+      if (leakLocation) newBasicInfo.leakLocation = leakLocation === "ceiling" ? "천장 부위 누수 (AI 진단)" : leakLocation === "floor" ? "바닥 배관 누수 (AI 진단)" : leakLocation === "wall" ? "벽면 균열 누수 (AI 진단)" : leakLocation;
+      if (urgency) newBasicInfo.urgency = urgency === "today" ? "당일 요망 (긴급)" : urgency === "scheduled" ? "일정 조율" : urgency;
+      if (boilerBrand) newBasicInfo.boilerBrand = boilerBrand;
+      if (boilerError) newBasicInfo.boilerError = boilerError;
+      if (boilerPipeSize) newBasicInfo.boilerPipeSize = boilerPipeSize;
+      if (elevator) newBasicInfo.elevator = true;
+      if (parking) newBasicInfo.parking = true;
+      if (heatingTarget) newBasicInfo.heatingTarget = heatingTarget;
+      
+      // Auto downstairs check if it is a ceiling leak
+      if (leakLocation === "ceiling") {
+        newBasicInfo.downstairsCheck = true;
+        newBasicInfo.leakAmount = "지속적으로 뚝뚝 떨어짐";
+      }
+
+      setBasicInfo(newBasicInfo);
+
+      // Pre-fill detect checklist
+      if (detectChecksParam) {
+        try {
+          const parsed = JSON.parse(detectChecksParam);
+          if (Array.isArray(parsed)) {
+            const newChecks: string[] = [];
+            if (parsed.includes("waterBill")) newChecks.push("1) 계량기 별침 확인");
+            if (parsed.includes("downstairsCheck")) newChecks.push("16) 아랫층 천장 확인");
+            if (parsed.includes("boilerCheck")) {
+              newChecks.push("4) 보일러 직수 off");
+              newChecks.push("6) 보일러 온수배관 탐지");
+            }
+            if (parsed.includes("detectFee")) {
+              setDetectionFee("350000"); // AI Premium detection fee
+            }
+            setDetectChecks(newChecks);
+            setIsDetectOpen(true);
+          }
+        } catch (e) {
+          console.error("Failed to parse detectChecks query:", e);
+        }
+      }
+
+      // Pre-select some typical required works based on leak type
+      if (leakLocation === "ceiling") {
+        setRequiredWorks(["특수 방수", "타일 마감"]);
+        setDetectionDetails("AI 진단 분석 결과: 위층 욕실 배수구 및 바닥 방수층 하자가 강력히 의심됩니다. 1차 아랫층 피해 지점 청음 점검 권장.");
+      } else if (leakLocation === "floor") {
+        setRequiredWorks(["상수도 배관", "부분 철거", "미장/방통"]);
+        setDetectionDetails("AI 진단 분석 결과: 바닥 난방/온수 배관 노후화로 인한 크랙 파열이 강력히 의심됩니다. 청음 및 가스 탐지 후 굴착 복구 공사 권장.");
+      } else if (leakLocation === "wall") {
+        setRequiredWorks(["특수 방수"]);
+        setDetectionDetails("AI 진단 분석 결과: 건물 외벽 크랙 혹은 창틀 주변 코킹 마모 빗물 누입이 의심됩니다. 외부 코킹 재시공 및 보강 권장.");
+      }
+    }
+  }, []);
+
+  // Phone number formatting helper
+  const formatPhoneNumber = (value: string) => {
+    const numbers = value.replace(/[^0-9]/g, "");
+    if (numbers.length <= 3) return numbers;
+    if (numbers.length <= 7) return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
+    return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`;
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhoneNumber(e.target.value);
+    setCustomerPhone(formatted);
+  };
+
+  const isValidPhone = customerPhone.replace(/[^0-9]/g, "").length >= 10;
 
   const toggleArray = (arr: string[], val: string, setter: React.Dispatch<React.SetStateAction<string[]>>) => {
     if (arr.includes(val)) setter(arr.filter(item => item !== val));
@@ -109,9 +224,33 @@ export default function EstimateChecklistPage() {
   };
 
   const sendAlimtalk = async () => {
-    if (!customerPhone || !estimatedPrice) return;
+    if (!isValidPhone || !estimatedPrice) return;
     setIsSending(true);
     try {
+      // 1. DB에 먼저 견적 데이터 저장
+      const dbRes = await fetch("/api/estimate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          basicInfo,
+          damageAreas,
+          customDamageArea,
+          timing,
+          detectChecks,
+          customDetectItem,
+          detectionDetails,
+          detectionFee,
+          requiredWorks,
+          estimatedPrice,
+          customerPhone: customerPhone.replace(/[^0-9]/g, "") // 하이픈 제거하고 저장
+        })
+      });
+      const dbData = await dbRes.json();
+      if (!dbData.success) {
+        console.error("견적 DB 저장 실패:", dbData.error);
+      }
+
+      // 2. 알림톡 발송
       const res = await fetch("/api/kakao/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -121,7 +260,8 @@ export default function EstimateChecklistPage() {
           templateParams: {
             estimate: estimatedPrice,
             works: requiredWorks.join(", ") || "세부 점검 필요",
-            damage: [...damageAreas, ...(customDamageArea ? [customDamageArea] : [])].join(", ") || "미지정"
+            damage: [...damageAreas, ...(customDamageArea ? [customDamageArea] : [])].join(", ") || "미지정",
+            leakLocation: basicInfo.leakLocation || "현장 확인"
           }
         })
       });
@@ -312,8 +452,31 @@ export default function EstimateChecklistPage() {
               </div>
             </div>
 
-            <h2 className="text-sm font-bold text-gray-800 mb-1 block">필요 작업 내용 판정</h2>
-            <p className="text-xs text-gray-500 mb-4">* 선택된 항목을 바탕으로 예상 견적이 합산됩니다.</p>
+            <div className="flex items-center justify-between mb-1.5">
+              <h2 className="text-sm font-bold text-gray-800">필요 작업 내용 판정</h2>
+              <button 
+                type="button"
+                onClick={() => {
+                  const storedDefaults = localStorage.getItem("owl_default_costs");
+                  let activeDefaults = INITIAL_DEFAULT_COSTS;
+                  if (storedDefaults) {
+                    try {
+                      const parsed = JSON.parse(storedDefaults);
+                      if (parsed && typeof parsed === "object") {
+                        activeDefaults = { ...INITIAL_DEFAULT_COSTS, ...parsed };
+                      }
+                    } catch (e) {}
+                  }
+                  setSettingsCosts(activeDefaults);
+                  setIsSettingsOpen(true);
+                }}
+                className="flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 transition-colors px-2.5 py-1 bg-blue-50 hover:bg-blue-100 rounded-lg shadow-sm"
+              >
+                <Settings size={12} className="animate-spin-slow" />
+                기본 단가 설정
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mb-4">* 선택된 항목을 바탕으로 예상 견적이 합산됩니다. 단가 입력 필드에서 즉시 수정 가능합니다.</p>
             <div className="flex flex-col gap-2">
               {workOptions.map((work) => (
                 <label key={work.name} className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl cursor-pointer hover:border-blue-400 transition-all">
@@ -323,7 +486,25 @@ export default function EstimateChecklistPage() {
                     </div>
                     <span className={`text-sm font-medium ${requiredWorks.includes(work.name) ? 'text-gray-900' : 'text-gray-600'}`}>{work.name}</span>
                   </div>
-                  <span className="text-xs text-gray-400">+{new Intl.NumberFormat('ko-KR').format(work.cost)}원</span>
+
+                  {/* 🦉 실시간 직접 인풋 수정 폼 (이벤트 전파 방지 버블링 차단 완벽 적용) */}
+                  <div 
+                    className="flex items-center gap-1.5"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <input 
+                      type="text" 
+                      value={currentCosts[work.name] === undefined ? "" : new Intl.NumberFormat('ko-KR').format(currentCosts[work.name])}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value.replace(/[^0-9]/g, '')) || 0;
+                        setCurrentCosts(prev => ({ ...prev, [work.name]: val }));
+                      }}
+                      className="w-24 px-2 py-1 text-right text-xs font-bold bg-gray-50 border border-gray-200 rounded-lg text-blue-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-inner"
+                      placeholder="0"
+                    />
+                    <span className="text-xs font-semibold text-gray-400">원</span>
+                  </div>
+
                   <input type="checkbox" className="hidden" checked={requiredWorks.includes(work.name)} onChange={() => toggleArray(requiredWorks, work.name, setRequiredWorks)} />
                 </label>
               ))}
@@ -356,20 +537,42 @@ export default function EstimateChecklistPage() {
               </div>
 
               {/* Send Alimtalk */}
-              <div className="mt-8 space-y-3">
-                <h2 className="text-sm font-bold text-gray-800">결과 알림톡 고객 발송</h2>
+              <div className="mt-8 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-bold text-gray-800">결과 알림톡 고객 발송</h2>
+                  {isValidPhone && !sendSuccess && (
+                    <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold">발송 가능</span>
+                  )}
+                </div>
+
+                {/* Message Preview */}
+                {!sendSuccess && (
+                  <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm text-xs text-gray-600 space-y-2 relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-yellow-400"></div>
+                    <p className="font-bold text-gray-800">[부엉이누수탐지랩] 견적 결과 안내</p>
+                    <p>안녕하세요, 고객님. 요청하신 현장의 누수 점검 및 견적 결과입니다.</p>
+                    <div className="space-y-1 py-1">
+                      <p>• 누수 위치: <span className="text-blue-600 font-medium">{basicInfo.leakLocation || "현장 확인"}</span></p>
+                      <p>• 필요 작업: <span className="font-medium text-gray-800">{requiredWorks.join(", ") || "상세 점검 필요"}</span></p>
+                      <p>• 예상 견적: <span className="font-bold text-gray-900">{estimatedPrice}</span></p>
+                    </div>
+                    <p>문의사항은 본 번호로 연락 부탁드립니다.</p>
+                  </div>
+                )}
+
                 <div className="flex gap-2">
                   <input 
                     type="tel"
-                    placeholder="고객 연락처 (예: 01012345678)"
+                    placeholder="고객 연락처 (010-0000-0000)"
                     value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
-                    className="flex-1 bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+                    onChange={handlePhoneChange}
+                    maxLength={13}
+                    className="flex-1 bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all"
                   />
                   <button
                     onClick={sendAlimtalk}
-                    disabled={!customerPhone || isSending || sendSuccess}
-                    className="bg-[#FFE812] hover:bg-[#F4DC00] disabled:bg-gray-200 text-slate-800 px-5 rounded-xl font-bold flex items-center justify-center transition-colors min-w-[80px] shadow-sm"
+                    disabled={!isValidPhone || isSending || sendSuccess}
+                    className="bg-[#FFE812] hover:bg-[#F4DC00] disabled:bg-gray-100 disabled:text-gray-400 text-slate-800 px-5 rounded-xl font-bold flex items-center justify-center transition-all min-w-[80px] shadow-sm active:scale-95"
                   >
                     {isSending ? (
                       <span className="w-5 h-5 border-2 border-slate-400 border-t-slate-800 rounded-full animate-spin"></span>
@@ -389,6 +592,80 @@ export default function EstimateChecklistPage() {
             </section>
           )}
         </div>
+
+        {/* 🦉 기본 단가 설정 편집용 유리 블러(Glassmorphism) 오버레이 모달 */}
+        {isSettingsOpen && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
+            <style dangerouslySetInnerHTML={{ __html: `
+              @keyframes spin-slow {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+              }
+              .animate-spin-slow {
+                animation: spin-slow 8s linear infinite;
+              }
+            ` }} />
+            <div className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl border border-gray-100 flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200">
+              {/* Header */}
+              <div className="px-6 py-5 bg-gradient-to-r from-blue-900 to-indigo-900 text-white flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Settings size={18} className="text-yellow-400 animate-spin-slow" />
+                  <h3 className="font-bold text-sm">기본 설정 단가 편집</h3>
+                </div>
+                <span className="text-[10px] font-bold bg-blue-800 text-blue-200 px-2 py-0.5 rounded-full">영구 저장</span>
+              </div>
+
+              {/* Form Content */}
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4 text-left">
+                <p className="text-xs text-gray-500 leading-relaxed mb-1">
+                  * 이곳에서 수정한 금액은 브라우저에 **기본값**으로 영구 보존되어, 향후 새 견적을 작성할 때 항상 기본값으로 나타납니다.
+                </p>
+                {Object.keys(INITIAL_DEFAULT_COSTS).map((workName) => (
+                  <div key={workName} className="flex flex-col gap-1.5 bg-gray-50 p-3 rounded-2xl border border-gray-100 hover:border-blue-100 transition-all">
+                    <label className="text-[11px] font-bold text-gray-600 px-1">{workName}</label>
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="text" 
+                        value={settingsCosts[workName] === undefined ? "" : new Intl.NumberFormat('ko-KR').format(settingsCosts[workName])}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value.replace(/[^0-9]/g, '')) || 0;
+                          setSettingsCosts(prev => ({ ...prev, [workName]: val }));
+                        }}
+                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-right text-indigo-900 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all"
+                      />
+                      <span className="text-xs font-bold text-gray-500">원</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex gap-3">
+                <button 
+                  type="button"
+                  onClick={() => setIsSettingsOpen(false)}
+                  className="flex-1 py-3 border border-gray-200 text-gray-500 hover:bg-gray-100 rounded-xl text-xs font-bold text-center transition-colors"
+                >
+                  취소
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    localStorage.setItem("owl_default_costs", JSON.stringify(settingsCosts));
+                    setCurrentCosts(settingsCosts);
+                    setIsSettingsOpen(false);
+                    if (typeof window !== "undefined") {
+                      alert("기본 단가 설정이 안전하게 영구 저장되었습니다.");
+                    }
+                  }}
+                  className="flex-1 py-3 bg-blue-900 hover:bg-blue-950 text-white rounded-xl text-xs font-bold text-center transition-colors shadow-md shadow-blue-900/20"
+                >
+                  저장 및 동기화
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

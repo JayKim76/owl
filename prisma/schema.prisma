@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Customer {
+  id        Int        @id @default(autoincrement())
+  name      String?
+  phone     String     @unique
+  address   String?
+  createdAt DateTime   @default(now())
+  estimates Estimate[]
+  tasks     Task[]
+}
+
+model Partner {
+  id          Int      @id @default(autoincrement())
+  companyName String
+  contactName String?
+  phone       String
+  specialty   String?
+  createdAt   DateTime @default(now())
+  tasks       Task[]
+}
+
+model Estimate {
+  id              Int       @id @default(autoincrement())
+  customer        Customer? @relation(fields: [customerId], references: [id])
+  customerId      Int?
+  customerPhone   String?
+  
+  // 1. 기본 정보
+  parking         Boolean   @default(false)
+  elevator        Boolean   @default(false)
+  heatingTarget   String?
+  floorLevel      String?
+  leakLocation    String?
+  leakAmount      String?
+  urgency         String?
+  boilerBrand     String?
+  boilerError     String?
+  boilerPipeSize  String?
+  waterBill       String?
+  managerCheck    Boolean   @default(false)
+  downstairsCheck Boolean   @default(false)
+  
+  // 2. 피해 증상
+  damageAreas      Json?    // ["화장실", "거실"]
+  customDamageArea String?
+  timing           String?
+  
+  // 3. 탐지 수칙
+  detectChecks     Json?
+  customDetectItem String?
+  
+  // 4. 필요 작업 내용 및 비용
+  detectionDetails String?
+  detectionFee     Int?
+  requiredWorks    Json?
+  estimatedMinPrice Int?
+  estimatedMaxPrice Int?
+  
+  createdAt       DateTime  @default(now())
+  task            Task?
+}
+
+model Task {
+  id           Int       @id @default(autoincrement())
+  estimate     Estimate? @relation(fields: [estimateId], references: [id])
+  estimateId   Int?      @unique
+  customer     Customer? @relation(fields: [customerId], references: [id])
+  customerId   Int?
+  partner      Partner?  @relation(fields: [partnerId], references: [id])
+  partnerId    Int?
+  
+  title        String
+  status       String    @default("대기중")
+  scheduledDate DateTime?
+  description  String?
+  
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}

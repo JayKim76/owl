@@ -1,8 +1,80 @@
-import { Wrench, PhoneCall, CalendarClock, Briefcase, FileText, ChevronRight, Settings, Users, ArrowRight, UserPlus } from "lucide-react";
+import { Wrench, PhoneCall, CalendarClock, Briefcase, FileText, ChevronRight, Settings, Users, ArrowRight, UserPlus, Sparkles } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import prisma from "@/lib/prisma";
 
-export default function Home() {
+export default async function Home() {
+  // Fetch real data
+  const inProgressTasksCount = await prisma.task.count({
+    where: { status: "진행중" },
+  });
+
+  const urgentEstimatesCount = await prisma.estimate.count({
+    where: { urgency: { contains: "당일" } },
+  });
+
+  // Date calculations for the weekly calendar
+  const now = new Date();
+  const currentDay = now.getDay(); // 0 (Sun) to 6 (Sat)
+  
+  // Calculate Monday of the current week
+  const monday = new Date(now);
+  const diffToMonday = currentDay === 0 ? -6 : 1 - currentDay;
+  monday.setDate(now.getDate() + diffToMonday);
+  monday.setHours(0, 0, 0, 0);
+
+  // Calculate week number of the month
+  const getWeekOfMonth = (date: Date) => {
+    const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+    const dayOfWeek = startOfMonth.getDay() || 7; // 1 (Mon) to 7 (Sun)
+    return Math.ceil((date.getDate() + (dayOfWeek - 1)) / 7);
+  };
+  
+  const weekLabel = `${now.getMonth() + 1}월 ${getWeekOfMonth(now)}주차`;
+  const todayLabel = `오늘: ${now.getMonth() + 1}월 ${now.getDate()}일 (${['일', '월', '화', '수', '목', '금', '토'][now.getDay()]})`;
+
+  // Fetch tasks for the entire current week to show dots
+  const startOfWeek = new Date(monday);
+  const endOfWeek = new Date(monday);
+  endOfWeek.setDate(monday.getDate() + 6);
+  endOfWeek.setHours(23, 59, 59, 999);
+
+  const weeklyTasks = await prisma.task.findMany({
+    where: {
+      scheduledDate: {
+        gte: startOfWeek,
+        lte: endOfWeek,
+      },
+    },
+  });
+
+  // Calendar days generation
+  const weekDayLabels = ['월', '화', '수', '목', '금', '토', '일'];
+  const calendarDays = weekDayLabels.map((label, index) => {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + index);
+    const isToday = date.toDateString() === new Date().toDateString();
+    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+    const hasSchedule = weeklyTasks.some(t => t.scheduledDate && t.scheduledDate.toDateString() === date.toDateString());
+    
+    return {
+      day: label,
+      date: date.getDate().toString(),
+      hasSchedule,
+      isToday,
+      isWeekend
+    };
+  });
+
+  // Fetch upcoming tasks for the list below the calendar (3 most recent from now)
+  const upcomingTasks = await prisma.task.findMany({
+    where: { 
+      scheduledDate: { gte: new Date() } 
+    },
+    orderBy: { scheduledDate: 'asc' },
+    take: 3,
+    include: { customer: true }
+  });
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 font-sans sm:bg-gray-100 sm:items-center sm:py-10">
       <main className="flex flex-col w-full max-w-md bg-white min-h-screen sm:min-h-full sm:rounded-3xl sm:overflow-hidden sm:shadow-2xl">
@@ -32,19 +104,19 @@ export default function Home() {
           <section>
             <h2 className="text-sm font-semibold text-gray-500 mb-3 px-1">업무 요약</h2>
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex flex-col justify-between">
+              <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex flex-col justify-between shadow-sm hover:shadow-md transition-all cursor-pointer">
                 <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mb-3">
                   <Wrench size={18} />
                 </div>
                 <h3 className="text-sm font-medium text-gray-600">진행 중 공사</h3>
-                <p className="text-2xl font-bold text-blue-900 mt-1">3건</p>
+                <p className="text-2xl font-bold text-blue-900 mt-1">{inProgressTasksCount}건</p>
               </div>
-              <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex flex-col justify-between">
+              <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex flex-col justify-between shadow-sm hover:shadow-md transition-all cursor-pointer">
                 <div className="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-3">
                   <PhoneCall size={18} />
                 </div>
                 <h3 className="text-sm font-medium text-gray-600">긴급 출동 대기</h3>
-                <p className="text-2xl font-bold text-red-600 mt-1">1건</p>
+                <p className="text-2xl font-bold text-red-600 mt-1">{urgentEstimatesCount}건</p>
               </div>
             </div>
           </section>
@@ -57,19 +129,11 @@ export default function Home() {
             </div>
             <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
               <div className="flex justify-between items-center mb-4">
-                <span className="font-bold text-gray-800">4월 2주차</span>
-                <span className="text-xs font-medium bg-blue-50 text-blue-700 px-2 py-1 rounded-md">오늘: 4월 2일 (목)</span>
+                <span className="font-bold text-gray-800">{weekLabel}</span>
+                <span className="text-xs font-medium bg-blue-50 text-blue-700 px-2 py-1 rounded-md">{todayLabel}</span>
               </div>
               <div className="flex justify-between">
-                {[
-                  { day: '월', date: '30', hasSchedule: false },
-                  { day: '화', date: '31', hasSchedule: true },
-                  { day: '수', date: '1', hasSchedule: false },
-                  { day: '목', date: '2', hasSchedule: true, isToday: true },
-                  { day: '금', date: '3', hasSchedule: true },
-                  { day: '토', date: '4', hasSchedule: false },
-                  { day: '일', date: '5', hasSchedule: false, isWeekend: true },
-                ].map((item, idx) => (
+                {calendarDays.map((item, idx) => (
                   <div key={idx} className={`flex flex-col items-center py-2 rounded-xl w-10 transition-colors ${item.isToday ? 'bg-blue-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-50 cursor-pointer'}`}>
                     <span className={`text-xs mb-1 ${item.isWeekend && !item.isToday ? 'text-red-400' : ''}`}>{item.day}</span>
                     <span className={`font-semibold text-sm ${item.isToday ? 'text-white' : 'text-gray-800'}`}>{item.date}</span>
@@ -80,20 +144,21 @@ export default function Home() {
                 ))}
               </div>
               <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
-                <div className="flex items-center justify-between group cursor-pointer">
-                  <div className="flex items-center gap-3 text-sm">
-                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                    <span className="text-gray-800">10:00 - 서초 래미안 아파트 누수 탐지</span>
-                  </div>
-                  <ChevronRight size={16} className="text-gray-300 group-hover:text-blue-500" />
-                </div>
-                <div className="flex items-center justify-between group cursor-pointer">
-                  <div className="flex items-center gap-3 text-sm">
-                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
-                    <span className="text-gray-800 font-bold">14:00 - 긴급: 송파 다세대 주택 배관</span>
-                  </div>
-                  <ChevronRight size={16} className="text-gray-300 group-hover:text-red-500" />
-                </div>
+                {upcomingTasks.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-2">예정된 일정이 없습니다.</p>
+                ) : (
+                  upcomingTasks.map((task) => (
+                    <div key={task.id} className="flex items-center justify-between group cursor-pointer hover:bg-gray-50 p-2 -mx-2 rounded-xl transition-colors">
+                      <div className="flex items-center gap-3 text-sm">
+                        <div className={`w-2 h-2 rounded-full ${task.status === "진행중" ? "bg-red-500 animate-pulse" : "bg-blue-500"}`}></div>
+                        <span className="text-gray-800">
+                          {task.scheduledDate?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {task.title}
+                        </span>
+                      </div>
+                      <ChevronRight size={16} className="text-gray-300 group-hover:text-blue-500" />
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </section>
@@ -102,6 +167,22 @@ export default function Home() {
           <section>
             <h2 className="text-sm font-semibold text-gray-500 mb-3 px-1">빠른 메뉴</h2>
             <div className="space-y-3">
+              <Link href="/ai-diagnosis" className="w-full flex items-center justify-between p-4 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 shadow-sm hover:border-indigo-500 hover:shadow-md transition-all group relative overflow-hidden">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center group-hover:bg-indigo-600 transition-colors shadow-sm">
+                    <Sparkles size={20} className="animate-pulse" />
+                  </div>
+                  <div className="text-left">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-gray-800">AI 누수 진단</h3>
+                      <span className="text-[10px] font-bold bg-indigo-600 text-white px-1.5 py-0.5 rounded-full animate-bounce">NEW</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">사진 촬영 및 문제 부위 AI 정밀 분석</p>
+                  </div>
+                </div>
+                <ChevronRight className="text-indigo-400 group-hover:text-indigo-600 transition-colors" />
+              </Link>
+
               <Link href="/estimate" className="w-full flex items-center justify-between p-4 rounded-2xl bg-white border border-gray-200 shadow-sm hover:border-blue-500 hover:shadow-md transition-all group">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">

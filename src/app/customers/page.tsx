@@ -5,11 +5,10 @@ import Link from "next/link";
 import {
   ArrowLeft, Plus, Phone, MapPin, Wrench, AlertTriangle,
   Bell, BellRing, CheckCircle2, XCircle, Clock, Users,
-  ChevronRight, Search, UserPlus, Loader2, Send
+  ChevronRight, Search, UserPlus, Loader2, Send, Edit, Trash2
 } from "lucide-react";
 import {
-  Customer, PartnerNotification, JobType,
-  getCustomers, addCustomer, updateCustomer
+  Customer, PartnerNotification, JobType
 } from "@/lib/notificationStore";
 
 // ─── 협력사 목록 (partners 페이지와 동일 데이터 구조) ─────────────────────
@@ -21,7 +20,7 @@ const PARTNERS = [
   { id: "5", companyName: "드림미장",   type: "미장",     manager: "정재원", phone: "010-2222-3333", region: "인천·부천",     status: "inactive" },
 ];
 
-const PHASE1_SECONDS = 30; // 1차 알림 대기 시간(초)
+const PHASE1_SECONDS = 60; // 1차 알림 대기 시간(초)
 
 const JOB_TYPES: JobType[] = ["누수", "방수", "배관", "도배", "미장", "전기", "타일", "목수", "하수도고압세척", "마루부분시공"];
 
@@ -81,7 +80,6 @@ function NotificationModal({ customer, onClose, onUpdate }: NotificationModalPro
           const updated: Customer = { ...localCustomer, phase: "phase2" };
           setLocalCustomer(updated);
           onUpdate(updated);
-          updateCustomer(updated);
           return 0;
         }
         return prev - 1;
@@ -104,7 +102,6 @@ function NotificationModal({ customer, onClose, onUpdate }: NotificationModalPro
     clearInterval(timerRef.current!);
     setLocalCustomer(updated);
     onUpdate(updated);
-    updateCustomer(updated);
   }, [localCustomer, onUpdate]);
 
   return (
@@ -261,35 +258,131 @@ export default function CustomersPage() {
     isUrgent: false,
     detail: "",
   });
+  const [isEditing, setIsEditing] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
 
-  // 페이지 진입 시 localStorage에서 고객 목록 로드
+  // 페이지 진입 시 DB에서 고객 목록 로드
   useEffect(() => {
-    setCustomers(getCustomers());
+    fetch("/api/customers")
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          const withNotis = data.map(c => ({
+             ...c, 
+             notifications: c.notifications?.length ? c.notifications : buildNotifications(c) 
+          }));
+          setCustomers(withNotis);
+        }
+      });
   }, []);
 
-  // 고객 등록
-  const handleRegister = (e: React.FormEvent) => {
-    e.preventDefault();
-    const notifications = buildNotifications(formData);
-    const newCustomer: Customer = {
-      id: Date.now().toString(),
-      ...formData,
-      registeredAt: new Date().toISOString(),
-      phase: "phase1",
-      notifications,
-      phase1StartedAt: Date.now(),
-    };
-    addCustomer(newCustomer);
-    setCustomers([newCustomer, ...customers]);
-    setIsModalOpen(false);
-    setActiveCustomer(newCustomer);
+  const openRegisterModal = () => {
     setFormData({ name: "", phone: "", region: "", jobType: "누수", isUrgent: false, detail: "" });
+    setIsEditing(false);
+    setEditId(null);
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (customer: Customer, e: React.MouseEvent) => {
+    e.stopPropagation(); // Card click event prevented
+    setFormData({
+      name: customer.name,
+      phone: customer.phone,
+      region: customer.region,
+      jobType: customer.jobType,
+      isUrgent: customer.isUrgent,
+      detail: customer.detail,
+    });
+    setIsEditing(true);
+    setEditId(customer.id);
+    setIsModalOpen(true);
+  };
+
+  // 고객 등록 또는 수정
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      if (isEditing && editId) {
+        // Update logic
+        const res = await fetch(`/api/customers/${editId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        });
+
+        if (res.ok) {
+          const result = await res.json();
+          
+          // Map back to frontend Customer type
+          const updatedCustomer: Customer = {
+            ...customers.find(c => c.id === editId)!,
+            ...formData
+          };
+
+          setCustomers(customers.map(c => c.id === editId ? updatedCustomer : c));
+          setIsModalOpen(false);
+        } else {
+          const errorData = await res.json();
+          alert(`수정 실패: ${errorData.error || "알 수 없는 오류"}`);
+        }
+      } else {
+        // Registration logic
+        const notifications = buildNotifications(formData);
+        const res = await fetch("/api/customers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...formData, phase: "phase1", notifications }),
+        });
+
+        if (res.ok) {
+          const newCustomer = await res.json();
+          const withNotis = { ...newCustomer, notifications };
+          setCustomers([withNotis, ...customers]);
+          setIsModalOpen(false);
+          setActiveCustomer(withNotis);
+          setFormData({ name: "", phone: "", region: "", jobType: "누수", isUrgent: false, detail: "" });
+        } else {
+          const errorData = await res.json();
+          alert(`등록 실패: ${errorData.error || "알 수 없는 오류"}`);
+        }
+      }
+    } catch (error) {
+      console.error("Fetch error:", error);
+      alert("서버와 통신하는 중 오류가 발생했습니다. 서버가 실행 중인지 확인해 주세요.");
+    }
+  };
+
+  // 고객 삭제
+  const handleDelete = async (id: string, name: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm(`'${name}' 고객님 정보를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+
+    try {
+      const res = await fetch(`/api/customers/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setCustomers(prev => prev.filter(c => c.id !== id));
+      } else {
+        const errorData = await res.json();
+        alert(`삭제 실패: ${errorData.error || "알 수 없는 오류"}`);
+      }
+    } catch (error) {
+      console.error("Delete error:", error);
+      alert("삭제 중 오류가 발생했습니다.");
+    }
   };
 
   // 알림 상태 업데이트 콜백
-  const handleCustomerUpdate = useCallback((updated: Customer) => {
+  const handleCustomerUpdate = useCallback(async (updated: Customer) => {
     setCustomers((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
     setActiveCustomer(updated);
+    
+    // Update DB
+    await fetch(`/api/customers/${updated.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updated),
+    });
   }, []);
 
   const filteredCustomers = customers.filter(
@@ -297,8 +390,8 @@ export default function CustomersPage() {
   );
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50 font-sans">
-      <main className="flex flex-col w-full min-h-screen bg-white relative">
+    <div className="flex flex-col min-h-screen bg-gray-50 font-sans sm:bg-gray-100 sm:items-center sm:py-10">
+      <main className="flex flex-col w-full max-w-md bg-white min-h-screen sm:min-h-full sm:rounded-3xl sm:shadow-2xl relative overflow-hidden">
 
         {/* 헤더 */}
         <header className="flex items-center justify-between px-4 py-4 bg-blue-900 text-white sticky top-0 z-10">
@@ -314,7 +407,7 @@ export default function CustomersPage() {
             </div>
           </div>
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={openRegisterModal}
             className="flex items-center gap-1.5 bg-yellow-400 text-blue-900 text-sm font-bold px-3 py-2 rounded-xl hover:bg-yellow-300 transition-colors shadow"
           >
             <Plus size={16} />
@@ -351,10 +444,10 @@ export default function CustomersPage() {
               filteredCustomers.map((customer) => {
                 const cfg = PHASE_CONFIG[customer.phase];
                 return (
-                  <button
+                  <div
                     key={customer.id}
                     onClick={() => setActiveCustomer(customer)}
-                    className="w-full text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all p-4 group"
+                    className="w-full text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all p-4 group cursor-pointer"
                   >
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex items-center gap-2">
@@ -369,7 +462,23 @@ export default function CustomersPage() {
                           {cfg.label}
                         </span>
                       </div>
-                      <ChevronRight size={16} className="text-gray-300 group-hover:text-blue-500 transition-colors" />
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={(e) => openEditModal(customer, e)}
+                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="수정"
+                        >
+                          <Edit size={16} />
+                        </button>
+                        <button
+                          onClick={(e) => handleDelete(customer.id, customer.name, e)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="삭제"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                        <ChevronRight size={16} className="text-gray-300 group-hover:text-blue-500 transition-colors ml-1" />
+                      </div>
                     </div>
                     <h3 className="font-bold text-gray-900">{customer.name}</h3>
                     <div className="flex items-center gap-3 mt-1">
@@ -385,7 +494,7 @@ export default function CustomersPage() {
                         <CheckCircle2 size={11} /> 담당: {customer.assignedPartner}
                       </p>
                     )}
-                  </button>
+                  </div>
                 );
               })
             )}
@@ -398,8 +507,8 @@ export default function CustomersPage() {
             <div className="bg-white w-full max-w-lg max-h-[90vh] rounded-3xl shadow-2xl overflow-y-auto flex flex-col">
               <div className="flex justify-between items-center px-6 py-5 border-b border-gray-100 sticky top-0 bg-white/95 backdrop-blur z-10">
                 <div>
-                  <h2 className="text-lg font-bold text-gray-900">고객 등록</h2>
-                  <p className="text-xs text-gray-500 mt-0.5">등록 즉시 지역 협력사에 알림이 발송됩니다</p>
+                  <h2 className="text-lg font-bold text-gray-900">{isEditing ? "고객 정보 수정" : "고객 등록"}</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">{isEditing ? "고객의 상세 정보를 수정합니다" : "등록 즉시 지역 협력사에 알림이 발송됩니다"}</p>
                 </div>
                 <button onClick={() => setIsModalOpen(false)} className="text-sm text-gray-500 font-semibold bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-full transition-colors">
                   취소
@@ -469,16 +578,18 @@ export default function CustomersPage() {
                     className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all text-sm resize-none" />
                 </div>
 
-                {/* 등록 버튼 */}
+                {/* 등록/수정 버튼 */}
                 <div className="pt-4 border-t border-gray-100">
                   <button type="submit"
                     className="w-full bg-blue-900 hover:bg-blue-800 text-white font-bold rounded-2xl py-4 shadow-lg transition-all flex items-center justify-center gap-2">
-                    <Send size={18} />
-                    등록 및 알림 발송
+                    {isEditing ? <CheckCircle2 size={18} /> : <Send size={18} />}
+                    {isEditing ? "정보 수정 완료" : "등록 및 알림 발송"}
                   </button>
-                  <p className="text-xs text-gray-400 text-center mt-2">
-                    등록 즉시 지역 협력사 → 전체 순으로 자동 알림이 발송됩니다
-                  </p>
+                  {!isEditing && (
+                    <p className="text-xs text-gray-400 text-center mt-2">
+                      등록 즉시 지역 협력사 → 전체 순으로 자동 알림이 발송됩니다
+                    </p>
+                  )}
                 </div>
               </form>
             </div>

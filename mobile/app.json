@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "mobile",
+    "name": "부엉이누수탐지랩",
     "slug": "mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -18,6 +18,7 @@
     "android": {
       "package": "com.jaykim.owl",
       "versionCode": 1,
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -31,6 +32,11 @@
     "plugins": [
       "expo-secure-store",
       "@react-native-community/datetimepicker"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "d7a55620-953c-4afc-b6f4-f494afac40f3"
+      }
+    }
   }
 }

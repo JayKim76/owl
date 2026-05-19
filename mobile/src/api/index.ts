@@ -5,6 +5,9 @@ import { CONFIG } from '../constants/Config';
 const api = axios.create({
   baseURL: CONFIG.API_BASE_URL,
   timeout: CONFIG.TIMEOUT,
+  headers: {
+    'Bypass-Tunnel-Reminder': 'true',
+  },
 });
 
 // Request Interceptor: 모든 요청에 토큰 추가

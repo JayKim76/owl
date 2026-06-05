@@ -60,7 +60,7 @@ export const LoginScreen = () => {
       style={[styles.container, { backgroundColor: colors.background }]}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View className="flex-1 justify-center px-8">
+        <View style={styles.innerContainer}>
           {/* Logo Section */}
           <View style={styles.logoContainer}>
             <View style={[styles.logoIcon, { backgroundColor: colors.surface }]}>
@@ -113,6 +113,11 @@ export const LoginScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  innerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 32,
   },
   logoContainer: {
     alignItems: 'center',

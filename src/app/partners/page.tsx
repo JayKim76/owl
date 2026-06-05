@@ -1,16 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, Plus, Phone, Mail, Users, Briefcase,
   Star, CheckCircle2, Clock, XCircle, Building2,
-  ChevronRight, Search, Filter, MapPin, Hash
+  Search, Filter, MapPin, Hash, Edit, Trash2
 } from "lucide-react";
 
 // 협력사 타입 정의
 type PartnerStatus = "active" | "pending" | "inactive";
-type PartnerType = "누수" | "방수" | "배관" | "도배" | "미장" | "전기" | "타일" | "목수" | "하수도고압세척" | "마루부분시공";
+type PartnerType = "일반" | "누수" | "방수" | "배관" | "도배" | "미장" | "전기" | "타일" | "목수" | "하수도고압세척" | "마루부분시공";
 
 interface Partner {
   id: string;
@@ -103,6 +103,7 @@ const INITIAL_PARTNERS: Partner[] = [
 
 // 업종별 색상 맵
 const TYPE_COLOR: Record<PartnerType, { bg: string; text: string; border: string }> = {
+  일반: { bg: "bg-slate-50", text: "text-slate-700", border: "border-slate-200" },
   누수: { bg: "bg-sky-50", text: "text-sky-700", border: "border-sky-200" },
   방수: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" },
   배관: { bg: "bg-cyan-50", text: "text-cyan-700", border: "border-cyan-200" },
@@ -137,11 +138,15 @@ const STATUS_CONFIG: Record<PartnerStatus, { label: string; icon: React.ReactNod
   },
 };
 
-const PARTNER_TYPES: PartnerType[] = ["누수", "방수", "배관", "도배", "미장", "전기", "타일", "목수", "하수도고압세척", "마루부분시공"];
+const PARTNER_TYPES: PartnerType[] = ["일반", "누수", "방수", "배관", "도배", "미장", "전기", "타일", "목수", "하수도고압세척", "마루부분시공"];
 
 export default function PartnersPage() {
-  const [partners, setPartners] = useState<Partner[]>(INITIAL_PARTNERS);
+  const [partners, setPartners] = useState<Partner[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<PartnerStatus | "all">("all");
 
@@ -154,25 +159,107 @@ export default function PartnersPage() {
     email: "",
     region: "",
     partnerCode: "",
+    status: "pending" as PartnerStatus,
     memo: "",
+    password: "",
   });
 
-  // 파트너 등록 처리
-  const handleAddPartner = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.companyName || !formData.manager || !formData.phone) return;
+  const resetForm = () => {
+    setFormData({ companyName: "", type: "방수", manager: "", phone: "", email: "", region: "", partnerCode: "", status: "pending", memo: "", password: "" });
+    setIsEditing(false);
+    setEditId(null);
+  };
 
-    const newPartner: Partner = {
-      id: Date.now().toString(),
-      ...formData,
-      status: "pending",
-      rating: 0,
-      completedJobs: 0,
-    };
+  const openAddModal = () => {
+    resetForm();
+    setIsModalOpen(true);
+  };
 
-    setPartners([newPartner, ...partners]);
+  const openEditModal = (partner: Partner) => {
+    setFormData({
+      companyName: partner.companyName,
+      type: partner.type,
+      manager: partner.manager,
+      phone: partner.phone,
+      email: partner.email,
+      region: partner.region,
+      partnerCode: partner.partnerCode,
+      status: partner.status,
+      memo: partner.memo,
+      password: "",
+    });
+    setIsEditing(true);
+    setEditId(partner.id);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
     setIsModalOpen(false);
-    setFormData({ companyName: "", type: "방수", manager: "", phone: "", email: "", region: "", partnerCode: "", memo: "" });
+    resetForm();
+  };
+
+  const loadPartners = async () => {
+    setIsLoading(true);
+    setErrorMessage("");
+    try {
+      const response = await fetch("/api/partners", { cache: "no-store" });
+      if (!response.ok) throw new Error("협력사 목록을 불러오지 못했습니다.");
+      const data = await response.json() as Partner[];
+      setPartners(data);
+    } catch (error) {
+      console.error(error);
+      setErrorMessage("협력사 데이터를 불러오지 못했습니다.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadPartners();
+  }, []);
+
+  // 파트너 등록/수정 처리
+  const handleSavePartner = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage("");
+    if (!formData.companyName || !formData.manager || !formData.phone) return;
+    if (!isEditing && !formData.password) {
+      setErrorMessage("협력사와 함께 생성할 일반 사용자 로그인 비밀번호를 입력해주세요.");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/partners", {
+        method: isEditing ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: editId, ...formData }),
+      });
+
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(result.error || "save-failed");
+      }
+
+      await loadPartners();
+      closeModal();
+    } catch (error) {
+      console.error(error);
+      setErrorMessage("저장에 실패했습니다. 연락처 또는 파트너 코드가 중복인지 확인해주세요.");
+    }
+  };
+
+  // 파트너 삭제 처리
+  const handleDeletePartner = async (partner: Partner) => {
+    if (!confirm(`'${partner.companyName}' 협력사를 삭제하시겠습니까?\n연결된 일반 사용자 계정도 함께 삭제됩니다.`)) return;
+    setErrorMessage("");
+    try {
+      const response = await fetch(`/api/partners?id=${partner.id}`, { method: "DELETE" });
+      if (!response.ok) throw new Error("delete-failed");
+      await loadPartners();
+    } catch (error) {
+      console.error(error);
+      setErrorMessage("삭제에 실패했습니다.");
+    }
   };
 
   // 필터링된 파트너 목록
@@ -208,15 +295,20 @@ export default function PartnersPage() {
             </div>
           </div>
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={openAddModal}
             className="flex items-center gap-1.5 bg-yellow-400 text-slate-900 text-sm font-bold px-3 py-2 rounded-xl hover:bg-yellow-300 transition-colors shadow"
           >
             <Plus size={16} />
-            업체 등록
+            업체(협력사) 등록
           </button>
         </header>
 
         <div className="flex-1 overflow-y-auto pb-24">
+          {errorMessage && (
+            <div className="mx-6 mt-4 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+              {errorMessage}
+            </div>
+          )}
 
           {/* 요약 카드 섹션 */}
           <div className="bg-slate-900 px-6 pb-6 pt-2">
@@ -274,15 +366,20 @@ export default function PartnersPage() {
               파트너 목록 ({filteredPartners.length})
             </h2>
 
-            {filteredPartners.length === 0 ? (
+            {isLoading ? (
+              <div className="text-center py-16 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                <Building2 size={32} className="mx-auto text-gray-300 mb-2 animate-pulse" />
+                <p className="text-sm text-gray-400 font-medium">협력사 데이터를 불러오는 중입니다.</p>
+              </div>
+            ) : filteredPartners.length === 0 ? (
               <div className="text-center py-16 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
                 <Building2 size={32} className="mx-auto text-gray-300 mb-2" />
                 <p className="text-sm text-gray-400 font-medium">조건에 맞는 파트너가 없습니다.</p>
               </div>
             ) : (
               filteredPartners.map((partner) => {
-                const typeColor = TYPE_COLOR[partner.type];
-                const statusCfg = STATUS_CONFIG[partner.status];
+                const typeColor = TYPE_COLOR[partner.type] ?? TYPE_COLOR.일반;
+                const statusCfg = STATUS_CONFIG[partner.status] ?? STATUS_CONFIG.pending;
                 return (
                   <div
                     key={partner.id}
@@ -300,15 +397,35 @@ export default function PartnersPage() {
                             {statusCfg.label}
                           </span>
                         </div>
-                        <div className="flex items-center gap-1 text-yellow-400">
-                          {partner.rating > 0 ? (
-                            <>
-                              <Star size={13} fill="currentColor" />
-                              <span className="text-xs font-bold text-gray-700">{partner.rating}.0</span>
-                            </>
-                          ) : (
-                            <span className="text-xs text-gray-400">미평가</span>
-                          )}
+                        <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1 text-yellow-400 mr-1">
+                            {partner.rating > 0 ? (
+                              <>
+                                <Star size={13} fill="currentColor" />
+                                <span className="text-xs font-bold text-gray-700">{partner.rating}.0</span>
+                              </>
+                            ) : (
+                              <span className="text-xs text-gray-400">미평가</span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(partner)}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="수정"
+                            aria-label={`${partner.companyName} 수정`}
+                          >
+                            <Edit size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeletePartner(partner)}
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="삭제"
+                            aria-label={`${partner.companyName} 삭제`}
+                          >
+                            <Trash2 size={15} />
+                          </button>
                         </div>
                       </div>
 
@@ -361,18 +478,20 @@ export default function PartnersPage() {
           </div>
         </div>
 
-        {/* 파트너 등록 모달 */}
+        {/* 파트너 등록/수정 모달 */}
         {isModalOpen && (
-          <div className="absolute inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm sm:p-4">
-            <div className="bg-white w-full h-[90vh] sm:h-auto sm:max-h-[90vh] rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-y-auto animate-in slide-in-from-bottom-10 sm:zoom-in flex flex-col">
+          <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="bg-white w-full max-w-md max-h-[calc(100vh-2rem)] rounded-3xl shadow-2xl overflow-y-auto animate-in fade-in zoom-in-95 flex flex-col">
               {/* 모달 헤더 */}
               <div className="flex justify-between items-center px-6 py-5 border-b border-gray-100 sticky top-0 bg-white/95 backdrop-blur z-10">
                 <div>
-                  <h2 className="text-lg font-bold text-gray-900">협력사 등록</h2>
-                  <p className="text-xs text-gray-500 mt-0.5">새 파트너 업체를 등록합니다</p>
+                  <h2 className="text-lg font-bold text-gray-900">{isEditing ? "협력사 수정" : "협력사 등록"}</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {isEditing ? "기존 파트너 업체 정보를 수정합니다" : "새 파트너 업체를 등록합니다"}
+                  </p>
                 </div>
                 <button
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={closeModal}
                   className="text-sm text-gray-500 font-semibold hover:text-gray-800 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-full transition-colors"
                 >
                   취소
@@ -380,7 +499,7 @@ export default function PartnersPage() {
               </div>
 
               {/* 모달 폼 */}
-              <form onSubmit={handleAddPartner} className="p-6 space-y-5 flex-1">
+              <form onSubmit={handleSavePartner} className="p-6 space-y-5 flex-1">
                 {/* 업체명 */}
                 <div>
                   <label className="block text-xs font-bold text-gray-500 mb-1.5 ml-1">업체명 *</label>
@@ -444,6 +563,24 @@ export default function PartnersPage() {
                   </div>
                 </div>
 
+                {/* 일반 사용자 로그인 비밀번호 */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1.5 ml-1">
+                    일반 사용자 로그인 비밀번호 {isEditing ? "(변경 시 입력)" : "*"}
+                  </label>
+                  <input
+                    type="password"
+                    required={!isEditing}
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder={isEditing ? "비워두면 기존 비밀번호 유지" : "협력사 로그인 비밀번호"}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all text-sm"
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1 ml-1">
+                    협력사 등록 시 같은 연락처의 일반 사용자 계정이 함께 생성됩니다.
+                  </p>
+                </div>
+
                 {/* 이메일 */}
                 <div>
                   <label className="block text-xs font-bold text-gray-500 mb-1.5 ml-1">이메일</label>
@@ -480,14 +617,33 @@ export default function PartnersPage() {
                       <Hash size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                       <input
                         type="text"
+                        disabled={!isEditing}
                         value={formData.partnerCode}
                         onChange={(e) => setFormData({ ...formData, partnerCode: e.target.value.toUpperCase() })}
-                        placeholder="PTR-XX-000"
-                        className="w-full pl-9 pr-3 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all text-sm font-mono tracking-wide"
+                        placeholder={isEditing ? "PTR-XX-000" : "자동 생성됨"}
+                        className={`w-full pl-9 pr-3 py-3 rounded-xl border border-gray-200 transition-all text-sm font-mono tracking-wide ${
+                          !isEditing ? "bg-gray-50 text-gray-400 cursor-not-allowed" : "focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                        }`}
                       />
                     </div>
                   </div>
                 </div>
+
+                {/* 상태 변경 (수정 시에만 표시) */}
+                {isEditing && (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 mb-1.5 ml-1">상태 (관리자 승인)</label>
+                    <select
+                      value={formData.status}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value as PartnerStatus })}
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all text-sm appearance-none bg-white"
+                    >
+                      <option value="pending">검토중</option>
+                      <option value="active">활동중</option>
+                      <option value="inactive">비활동</option>
+                    </select>
+                  </div>
+                )}
 
                 {/* 메모 */}
                 <div>
@@ -501,17 +657,17 @@ export default function PartnersPage() {
                   />
                 </div>
 
-                {/* 등록 버튼 */}
+                {/* 등록/수정 버튼 */}
                 <div className="pt-4 border-t border-gray-100">
                   <button
                     type="submit"
                     className="w-full bg-slate-900 hover:bg-slate-700 text-white font-bold rounded-2xl py-4 shadow-lg transition-all flex items-center justify-center gap-2"
                   >
-                    <Plus size={20} />
-                    협력사 등록하기
+                    {isEditing ? <CheckCircle2 size={20} /> : <Plus size={20} />}
+                    {isEditing ? "협력사 정보 수정하기" : "협력사 등록하기"}
                   </button>
                   <p className="text-xs text-gray-400 text-center mt-3">
-                    등록 후 &apos;검토중&apos; 상태로 저장됩니다.
+                    {isEditing ? "수정해도 기존 상태, 평점, 완공 건수는 유지됩니다." : "등록 후 &apos;검토중&apos; 상태로 저장됩니다."}
                   </p>
                 </div>
               </form>

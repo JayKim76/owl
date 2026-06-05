@@ -53,7 +53,7 @@ export default function TaskBoard() {
           value={newTaskTitle}
           onChange={(e) => setNewTaskTitle(e.target.value)}
           placeholder="새로운 작업 입력..."
-          className="flex-1 px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm text-sm"
+          className="flex-1 px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm text-sm text-gray-800 font-medium"
           onKeyDown={(e) => e.key === "Enter" && handleAddTask()}
         />
         <button

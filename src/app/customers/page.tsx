@@ -253,6 +253,8 @@ export default function CustomersPage() {
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
+    tenantPhone: "",
+    victimPhone: "",
     region: "",
     jobType: "누수" as JobType,
     isUrgent: false,
@@ -277,7 +279,7 @@ export default function CustomersPage() {
   }, []);
 
   const openRegisterModal = () => {
-    setFormData({ name: "", phone: "", region: "", jobType: "누수", isUrgent: false, detail: "" });
+    setFormData({ name: "", phone: "", tenantPhone: "", victimPhone: "", region: "", jobType: "누수", isUrgent: false, detail: "" });
     setIsEditing(false);
     setEditId(null);
     setIsModalOpen(true);
@@ -288,6 +290,8 @@ export default function CustomersPage() {
     setFormData({
       name: customer.name,
       phone: customer.phone,
+      tenantPhone: customer.tenantPhone || "",
+      victimPhone: customer.victimPhone || "",
       region: customer.region,
       jobType: customer.jobType,
       isUrgent: customer.isUrgent,
@@ -341,7 +345,7 @@ export default function CustomersPage() {
           setCustomers([withNotis, ...customers]);
           setIsModalOpen(false);
           setActiveCustomer(withNotis);
-          setFormData({ name: "", phone: "", region: "", jobType: "누수", isUrgent: false, detail: "" });
+          setFormData({ name: "", phone: "", tenantPhone: "", victimPhone: "", region: "", jobType: "누수", isUrgent: false, detail: "" });
         } else {
           const errorData = await res.json();
           alert(`등록 실패: ${errorData.error || "알 수 없는 오류"}`);
@@ -553,6 +557,20 @@ export default function CustomersPage() {
                   <p className="text-xs text-blue-600 mt-1.5 ml-1 flex items-center gap-1">
                     <Bell size={11} /> 입력 지역의 활성 협력사에게 1차 알림이 발송됩니다
                   </p>
+                </div>
+
+                {/* 추가 연락처 */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 mb-1.5 ml-1">세입자 연락처</label>
+                    <input type="tel" value={formData.tenantPhone} onChange={(e) => setFormData({ ...formData, tenantPhone: e.target.value })}
+                      placeholder="010-0000-0000" className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 mb-1.5 ml-1">피해집주인 연락처</label>
+                    <input type="tel" value={formData.victimPhone} onChange={(e) => setFormData({ ...formData, victimPhone: e.target.value })}
+                      placeholder="010-0000-0000" className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all text-sm" />
+                  </div>
                 </div>
 
                 {/* 업종 */}

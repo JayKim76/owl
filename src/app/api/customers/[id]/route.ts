@@ -19,7 +19,7 @@ export async function PUT(
       return NextResponse.json({ error: "Empty or invalid JSON body" }, { status: 400 });
     }
     const { 
-      name, phone, region, jobType, isUrgent, detail, // Full edit fields
+      name, phone, tenantPhone, victimPhone, region, jobType, isUrgent, detail, // Full edit fields
       phase, assignedPartner // Phase/Partner update fields
     } = body;
 
@@ -34,12 +34,14 @@ export async function PUT(
     }
 
     // 2. Update Customer
-    if (name || phone || region) {
+    if (name !== undefined || phone !== undefined || region !== undefined || tenantPhone !== undefined || victimPhone !== undefined) {
       await prisma.customer.update({
         where: { id: task.customerId! },
         data: {
           ...(name && { name }),
           ...(phone && { phone }),
+          ...(tenantPhone !== undefined && { tenantPhone }),
+          ...(victimPhone !== undefined && { victimPhone }),
           ...(region && { address: region }),
         }
       });

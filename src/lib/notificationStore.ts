@@ -21,6 +21,8 @@ export interface Customer {
   id: string;
   name: string;
   phone: string;
+  tenantPhone?: string;
+  victimPhone?: string;
   region: string;         // 고객 주소/지역
   jobType: JobType;       // 필요 업종
   isUrgent: boolean;

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, Calculator, Send, CheckCircle2, CheckSquare, Square, ChevronDown, ChevronUp, Settings } from "lucide-react";
+import { ArrowLeft, Calculator, CheckCircle2, ChevronDown, ChevronUp, Settings } from "lucide-react";
 
 type CheckBoxProp = {
   label: string;
@@ -41,8 +41,6 @@ const INITIAL_DEFAULT_COSTS: Record<string, number> = {
 export default function EstimateChecklistPage() {
   // 1. 기본 정보
   const [basicInfo, setBasicInfo] = useState({
-    parking: false,
-    elevator: false,
     heatingTarget: "개별난방",
     boilerBrand: "",
     boilerError: "",
@@ -61,18 +59,6 @@ export default function EstimateChecklistPage() {
   const [customDamageArea, setCustomDamageArea] = useState<string>("");
   const [timing, setTiming] = useState<string>("");
 
-  // 3. 탐지 수칙
-  const [detectChecks, setDetectChecks] = useState<string[]>([]);
-  const detectOptions = [
-    "1) 계량기 별침 확인", "2) 변기,정수기 밸브 잠금", "3) 계량기 별침 체크", 
-    "4) 보일러 직수 off", "6) 보일러 온수배관 탐지", "7) 보일러 난방배관 탐지",
-    "9) 보일러 직수배관 탐지", "10) 유가, 바닥 줄눈 확인", "11) 방수 확인",
-    "12) 하수도 역류 확인", "13) 샷시 실리콘 확인", "14) 건물 크랙 확인", 
-    "15) 옥상 방수 확인", "16) 아랫층 천장 확인"
-  ];
-  const [isDetectOpen, setIsDetectOpen] = useState(false);
-  const [customDetectItem, setCustomDetectItem] = useState<string>("");
-
   // 🦉 단가 설정용 상태 관리 레이어 정의
   const [currentCosts, setCurrentCosts] = useState<Record<string, number>>(INITIAL_DEFAULT_COSTS);
   const [settingsCosts, setSettingsCosts] = useState<Record<string, number>>(INITIAL_DEFAULT_COSTS);
@@ -90,12 +76,22 @@ export default function EstimateChecklistPage() {
     { name: "특수 방수", cost: currentCosts["특수 방수"] ?? 500000 }
   ];
 
-  const [estimatedPrice, setEstimatedPrice] = useState<string | null>(null);
   const [customerPhone, setCustomerPhone] = useState("");
   const [detectionFee, setDetectionFee] = useState<string>("300000");
   const [detectionDetails, setDetectionDetails] = useState<string>("");
   const [isSending, setIsSending] = useState(false);
   const [sendSuccess, setSendSuccess] = useState(false);
+
+  // 🦉 견적 금액 자동 계산 (파생 상태)
+  const minCost = parseInt(detectionFee) || 0;
+  let addedCost = 0;
+  requiredWorks.forEach(workName => {
+    const cost = currentCosts[workName] ?? INITIAL_DEFAULT_COSTS[workName] ?? 0;
+    addedCost += cost;
+  });
+  const totalMin = minCost + addedCost;
+  const totalMax = totalMin + (totalMin * 0.2);
+  const estimatedPrice = `${new Intl.NumberFormat('ko-KR').format(totalMin)}원 ~ ${new Intl.NumberFormat('ko-KR').format(totalMax)}원`;
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -121,8 +117,6 @@ export default function EstimateChecklistPage() {
       const boilerBrand = params.get("boilerBrand");
       const boilerError = params.get("boilerError");
       const boilerPipeSize = params.get("boilerPipeSize");
-      const elevator = params.get("elevator") === "true";
-      const parking = params.get("parking") === "true";
       const heatingTarget = params.get("heatingTarget");
       const detectChecksParam = params.get("detectChecks");
       
@@ -132,8 +126,6 @@ export default function EstimateChecklistPage() {
       if (boilerBrand) newBasicInfo.boilerBrand = boilerBrand;
       if (boilerError) newBasicInfo.boilerError = boilerError;
       if (boilerPipeSize) newBasicInfo.boilerPipeSize = boilerPipeSize;
-      if (elevator) newBasicInfo.elevator = true;
-      if (parking) newBasicInfo.parking = true;
       if (heatingTarget) newBasicInfo.heatingTarget = heatingTarget;
       
       // Auto downstairs check if it is a ceiling leak
@@ -149,18 +141,9 @@ export default function EstimateChecklistPage() {
         try {
           const parsed = JSON.parse(detectChecksParam);
           if (Array.isArray(parsed)) {
-            const newChecks: string[] = [];
-            if (parsed.includes("waterBill")) newChecks.push("1) 계량기 별침 확인");
-            if (parsed.includes("downstairsCheck")) newChecks.push("16) 아랫층 천장 확인");
-            if (parsed.includes("boilerCheck")) {
-              newChecks.push("4) 보일러 직수 off");
-              newChecks.push("6) 보일러 온수배관 탐지");
-            }
             if (parsed.includes("detectFee")) {
               setDetectionFee("350000"); // AI Premium detection fee
             }
-            setDetectChecks(newChecks);
-            setIsDetectOpen(true);
           }
         } catch (e) {
           console.error("Failed to parse detectChecks query:", e);
@@ -202,22 +185,7 @@ export default function EstimateChecklistPage() {
   };
 
   const calculateEstimate = () => {
-    let minCost = parseInt(detectionFee) || 0; // 기본 출장 및 탐지 비용
-    let addedCost = 0;
-
-    requiredWorks.forEach(workName => {
-      const option = workOptions.find(o => o.name === workName);
-      if (option) addedCost += option.cost;
-    });
-
-    const totalMin = minCost + addedCost;
-    const totalMax = totalMin + (totalMin * 0.2); // +20% for max range
-    
-    setEstimatedPrice(
-      `${new Intl.NumberFormat('ko-KR').format(totalMin)}원 ~ ${new Intl.NumberFormat('ko-KR').format(totalMax)}원`
-    );
-    
-    // Auto scroll to bottom
+    // 이미 estimatedPrice가 자동으로 계산되므로, 결과 영역으로 스크롤만 이동합니다.
     setTimeout(() => {
       window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
     }, 100);
@@ -236,8 +204,8 @@ export default function EstimateChecklistPage() {
           damageAreas,
           customDamageArea,
           timing,
-          detectChecks,
-          customDetectItem,
+          detectChecks: [],
+          customDetectItem: "",
           detectionDetails,
           detectionFee,
           requiredWorks,
@@ -296,8 +264,6 @@ export default function EstimateChecklistPage() {
               기본 정보 체크
             </h2>
             <div className="grid grid-cols-2 gap-3 mb-4">
-              <Checkbox label="주차 가능 여부" checked={basicInfo.parking} onChange={() => setBasicInfo({...basicInfo, parking: !basicInfo.parking})} />
-              <Checkbox label="엘리베이터 유무" checked={basicInfo.elevator} onChange={() => setBasicInfo({...basicInfo, elevator: !basicInfo.elevator})} />
               <Checkbox label="건물 관리실 체크" checked={basicInfo.managerCheck} onChange={() => setBasicInfo({...basicInfo, managerCheck: !basicInfo.managerCheck})} />
               <Checkbox label="아랫집 확인 여부" checked={basicInfo.downstairsCheck} onChange={() => setBasicInfo({...basicInfo, downstairsCheck: !basicInfo.downstairsCheck})} />
             </div>
@@ -316,35 +282,35 @@ export default function EstimateChecklistPage() {
             <div className="mt-4 grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-gray-600 px-1">층수</label>
-                <input type="text" placeholder="예: 5층" value={basicInfo.floorLevel} onChange={(e) => setBasicInfo({...basicInfo, floorLevel: e.target.value})} className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all" />
+                <input type="text" placeholder="예: 5층" value={basicInfo.floorLevel} onChange={(e) => setBasicInfo({...basicInfo, floorLevel: e.target.value})} className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all text-gray-800 font-medium" />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-gray-600 px-1">누수 위치 상세</label>
-                <input type="text" placeholder="예: 안방 화장실 천장" value={basicInfo.leakLocation} onChange={(e) => setBasicInfo({...basicInfo, leakLocation: e.target.value})} className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all" />
+                <input type="text" placeholder="예: 안방 화장실 천장" value={basicInfo.leakLocation} onChange={(e) => setBasicInfo({...basicInfo, leakLocation: e.target.value})} className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all text-gray-800 font-medium" />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-gray-600 px-1">누수량</label>
-                <input type="text" placeholder="예: 뚝뚝 떨어짐" value={basicInfo.leakAmount} onChange={(e) => setBasicInfo({...basicInfo, leakAmount: e.target.value})} className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all" />
+                <input type="text" placeholder="예: 뚝뚝 떨어짐" value={basicInfo.leakAmount} onChange={(e) => setBasicInfo({...basicInfo, leakAmount: e.target.value})} className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all text-gray-800 font-medium" />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-gray-600 px-1">긴급도</label>
-                <input type="text" placeholder="예: 당일 요망" value={basicInfo.urgency} onChange={(e) => setBasicInfo({...basicInfo, urgency: e.target.value})} className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all" />
+                <input type="text" placeholder="예: 당일 요망" value={basicInfo.urgency} onChange={(e) => setBasicInfo({...basicInfo, urgency: e.target.value})} className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all text-gray-800 font-medium" />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-gray-600 px-1">보일러 브랜드</label>
-                <input type="text" placeholder="예: 경동, 귀뚜라미" value={basicInfo.boilerBrand} onChange={(e) => setBasicInfo({...basicInfo, boilerBrand: e.target.value})} className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all" />
+                <input type="text" placeholder="예: 경동, 귀뚜라미" value={basicInfo.boilerBrand} onChange={(e) => setBasicInfo({...basicInfo, boilerBrand: e.target.value})} className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all text-gray-800 font-medium" />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-gray-600 px-1">보일러 에러코드</label>
-                <input type="text" placeholder="예: E001, 15" value={basicInfo.boilerError} onChange={(e) => setBasicInfo({...basicInfo, boilerError: e.target.value})} className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all" />
+                <input type="text" placeholder="예: E001, 15" value={basicInfo.boilerError} onChange={(e) => setBasicInfo({...basicInfo, boilerError: e.target.value})} className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all text-gray-800 font-medium" />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-gray-600 px-1">직수 사이즈</label>
-                <input type="text" placeholder="예: 15A" value={basicInfo.boilerPipeSize} onChange={(e) => setBasicInfo({...basicInfo, boilerPipeSize: e.target.value})} className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all" />
+                <input type="text" placeholder="예: 15A" value={basicInfo.boilerPipeSize} onChange={(e) => setBasicInfo({...basicInfo, boilerPipeSize: e.target.value})} className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all text-gray-800 font-medium" />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-gray-600 px-1">수도 요금</label>
-                <input type="text" placeholder="예: 10만원 (평형대비 과다)" value={basicInfo.waterBill} onChange={(e) => setBasicInfo({...basicInfo, waterBill: e.target.value})} className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all" />
+                <input type="text" placeholder="예: 10만원 (평형대비 과다)" value={basicInfo.waterBill} onChange={(e) => setBasicInfo({...basicInfo, waterBill: e.target.value})} className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all text-gray-800 font-medium" />
               </div>
             </div>
           </section>
@@ -388,39 +354,6 @@ export default function EstimateChecklistPage() {
                 </button>
               ))}
             </div>
-          </section>
-
-          {/* Section 3: Detailed Checklist */}
-          <section className="bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden">
-            <button 
-              onClick={() => setIsDetectOpen(!isDetectOpen)}
-              className="w-full flex items-center justify-between p-4 bg-slate-100 hover:bg-slate-200 transition-colors"
-            >
-              <h2 className="text-sm font-bold text-slate-800">탐지 절차 체크리스트 ({detectChecks.length}/{detectOptions.length})</h2>
-              {isDetectOpen ? <ChevronUp size={20} className="text-slate-500" /> : <ChevronDown size={20} className="text-slate-500" />}
-            </button>
-            
-            {isDetectOpen && (
-              <div className="p-4 grid grid-cols-1 gap-2 max-h-64 overflow-y-auto">
-                {detectOptions.map((opt) => (
-                   <Checkbox 
-                   key={opt} label={opt} 
-                   checked={detectChecks.includes(opt)} 
-                   onChange={() => toggleArray(detectChecks, opt, setDetectChecks)} 
-                 />
-                ))}
-                
-                <div className="pt-2 mt-1 border-t border-slate-200">
-                  <input 
-                    type="text" 
-                    placeholder="기타 탐지 항목이나 특이사항 직접 입력" 
-                    value={customDetectItem} 
-                    onChange={(e) => setCustomDetectItem(e.target.value)} 
-                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all text-slate-700"
-                  />
-                </div>
-              </div>
-            )}
           </section>
 
           {/* Section 4: Required Works (Cost impact) */}
@@ -478,36 +411,46 @@ export default function EstimateChecklistPage() {
             </div>
             <p className="text-xs text-gray-500 mb-4">* 선택된 항목을 바탕으로 예상 견적이 합산됩니다. 단가 입력 필드에서 즉시 수정 가능합니다.</p>
             <div className="flex flex-col gap-2">
-              {workOptions.map((work) => (
-                <label key={work.name} className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl cursor-pointer hover:border-blue-400 transition-all">
-                  <div className="flex items-center gap-3">
-                    <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center transition-colors ${requiredWorks.includes(work.name) ? 'bg-blue-600 border-blue-600' : 'border-2 border-gray-300'}`}>
-                      {requiredWorks.includes(work.name) && <div className="w-2 h-2 rounded-full bg-white"></div>}
-                    </div>
-                    <span className={`text-sm font-medium ${requiredWorks.includes(work.name) ? 'text-gray-900' : 'text-gray-600'}`}>{work.name}</span>
-                  </div>
+              {workOptions.map((work) => {
+                const isSelected = requiredWorks.includes(work.name);
 
-                  {/* 🦉 실시간 직접 인풋 수정 폼 (이벤트 전파 방지 버블링 차단 완벽 적용) */}
-                  <div 
-                    className="flex items-center gap-1.5"
-                    onClick={(e) => e.stopPropagation()}
+                return (
+                  <div
+                    key={work.name}
+                    className={`flex items-center justify-between gap-3 p-4 bg-white border rounded-xl transition-all ${
+                      isSelected ? "border-blue-500 bg-blue-50/40 shadow-sm" : "border-gray-200 hover:border-blue-400"
+                    }`}
                   >
-                    <input 
-                      type="text" 
-                      value={currentCosts[work.name] === undefined ? "" : new Intl.NumberFormat('ko-KR').format(currentCosts[work.name])}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value.replace(/[^0-9]/g, '')) || 0;
-                        setCurrentCosts(prev => ({ ...prev, [work.name]: val }));
-                      }}
-                      className="w-24 px-2 py-1 text-right text-xs font-bold bg-gray-50 border border-gray-200 rounded-lg text-blue-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-inner"
-                      placeholder="0"
-                    />
-                    <span className="text-xs font-semibold text-gray-400">원</span>
-                  </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleArray(requiredWorks, work.name, setRequiredWorks)}
+                      aria-pressed={isSelected}
+                      className="flex min-w-0 flex-1 items-center gap-3 text-left active:scale-[0.99] transition-transform"
+                    >
+                      <span className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-2 border-gray-300'}`}>
+                        {isSelected && <span className="w-2.5 h-2.5 rounded-full bg-white" />}
+                      </span>
+                      <span className={`text-sm font-bold ${isSelected ? 'text-gray-900' : 'text-gray-600'}`}>{work.name}</span>
+                    </button>
 
-                  <input type="checkbox" className="hidden" checked={requiredWorks.includes(work.name)} onChange={() => toggleArray(requiredWorks, work.name, setRequiredWorks)} />
-                </label>
-              ))}
+                    {/* 🦉 단가 입력은 선택 버튼과 분리하여, 금액 수정 중에도 선택 상태가 꼬이지 않도록 처리 */}
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <input 
+                        type="text" 
+                        aria-label={`${work.name} 단가`}
+                        value={currentCosts[work.name] === undefined ? "" : new Intl.NumberFormat('ko-KR').format(currentCosts[work.name])}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value.replace(/[^0-9]/g, '')) || 0;
+                          setCurrentCosts(prev => ({ ...prev, [work.name]: val }));
+                        }}
+                        className="w-24 px-2 py-1 text-right text-xs font-bold bg-gray-50 border border-gray-200 rounded-lg text-blue-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-inner"
+                        placeholder="0"
+                      />
+                      <span className="text-xs font-semibold text-gray-400">원</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </section>
 
@@ -567,7 +510,7 @@ export default function EstimateChecklistPage() {
                     value={customerPhone}
                     onChange={handlePhoneChange}
                     maxLength={13}
-                    className="flex-1 bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all"
+                    className="flex-1 bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all text-gray-800 font-medium"
                   />
                   <button
                     onClick={sendAlimtalk}

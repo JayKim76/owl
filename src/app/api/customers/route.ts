@@ -16,6 +16,8 @@ export async function GET() {
       id: task.id.toString(),
       name: task.customer?.name || "알 수 없음",
       phone: task.customer?.phone || "알 수 없음",
+      tenantPhone: task.customer?.tenantPhone || "",
+      victimPhone: task.customer?.victimPhone || "",
       region: task.customer?.address || "지역 미상",
       jobType: task.estimate?.detectionDetails || "누수",
       isUrgent: task.estimate?.urgency === "당일 긴급 방문",
@@ -38,13 +40,13 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, phone, region, jobType, isUrgent, detail, phase } = body;
+    const { name, phone, tenantPhone, victimPhone, region, jobType, isUrgent, detail, phase } = body;
 
     // 1. Upsert Customer (find by phone or create)
     const customer = await prisma.customer.upsert({
       where: { phone },
-      update: { name, address: region },
-      create: { name, phone, address: region },
+      update: { name, tenantPhone, victimPhone, address: region },
+      create: { name, phone, tenantPhone, victimPhone, address: region },
     });
 
     // 2. Create Estimate

@@ -1,13 +1,55 @@
 import { NextResponse } from 'next/server';
 import { SignJWT } from 'jose';
+import prisma from '@/lib/prisma';
+import { verifyPassword } from '@/lib/password';
+
+export const runtime = 'nodejs';
+
+function getRedirectUrl(request: Request, pathname: string) {
+  const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'www.owl-leak.kr';
+  const forwardedProto = request.headers.get('x-forwarded-proto');
+  const protocol = forwardedProto || (host.includes('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https');
+
+  return new URL(pathname, `${protocol}://${host}`);
+}
+
+async function readPassword(request: Request) {
+  const contentType = request.headers.get('content-type') || '';
+
+  if (contentType.includes('application/x-www-form-urlencoded') || contentType.includes('multipart/form-data')) {
+    const formData = await request.formData();
+    return String(formData.get('password') || '');
+  }
+
+  const body = await request.json();
+  return String(body.password || '');
+}
+
+function wantsHtmlRedirect(request: Request) {
+  const accept = request.headers.get('accept') || '';
+  const contentType = request.headers.get('content-type') || '';
+
+  return accept.includes('text/html') || contentType.includes('application/x-www-form-urlencoded') || contentType.includes('multipart/form-data');
+}
 
 export async function POST(request: Request) {
   try {
-    const { password } = await request.json();
+    const password = await readPassword(request);
     const adminPassword = process.env.ADMIN_PASSWORD;
     const jwtSecret = process.env.JWT_SECRET || 'fallback_secret';
+    const shouldRedirect = wantsHtmlRedirect(request);
 
-    if (password === adminPassword) {
+    const adminUser = await prisma.adminUser.findFirst({
+      where: { username: 'admin', isActive: true },
+    });
+
+    const isDbPasswordValid = adminUser
+      ? verifyPassword(password, adminUser.passwordHash)
+      : false;
+
+    // Keep ADMIN_PASSWORD as a fallback so the site remains accessible if the
+    // database admin row is accidentally removed during maintenance.
+    if (isDbPasswordValid || (!adminUser && password === adminPassword)) {
       // Create JWT token for mobile apps
       const encoder = new TextEncoder();
       const token = await new SignJWT({ role: 'admin' })
@@ -16,33 +58,43 @@ export async function POST(request: Request) {
         .setExpirationTime('7d')
         .sign(encoder.encode(jwtSecret));
 
-      // Create response with success message and token
-      const response = NextResponse.json({ 
-        success: true, 
-        token: token,
-        message: '로그인 성공' 
-      });
-      
+      const response = shouldRedirect
+        ? NextResponse.redirect(getRedirectUrl(request, '/admin'), { status: 303 })
+        : NextResponse.json({
+            success: true,
+            token,
+            message: '로그인 성공',
+          });
+
       // Set HTTP-only cookie for web dashboard
       response.cookies.set({
         name: 'admin_session',
-        value: token, // Store the JWT in the cookie instead of just 'authenticated'
+        value: token,
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         path: '/',
-        maxAge: 60 * 60 * 24 * 7 // 1 week
+        maxAge: 60 * 60 * 24 * 7, // 1 week
       });
 
       return response;
-    } else {
-      return NextResponse.json(
-        { success: false, error: '비밀번호가 일치하지 않습니다.' },
-        { status: 401 }
-      );
     }
+
+    if (shouldRedirect) {
+      return NextResponse.redirect(getRedirectUrl(request, '/login?error=admin'), { status: 303 });
+    }
+
+    return NextResponse.json(
+      { success: false, error: '비밀번호가 일치하지 않습니다.' },
+      { status: 401 }
+    );
   } catch (error) {
     console.error('Login error:', error);
+
+    if (wantsHtmlRedirect(request)) {
+      return NextResponse.redirect(getRedirectUrl(request, '/login?error=server'), { status: 303 });
+    }
+
     return NextResponse.json(
       { success: false, error: '서버 오류가 발생했습니다.' },
       { status: 500 }

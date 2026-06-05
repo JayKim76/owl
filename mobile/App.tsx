@@ -19,9 +19,9 @@ export default function App() {
       return false; 
     };
 
-    BackHandler.addEventListener('hardwareBackPress', handleBackButton);
+    const subscription = BackHandler.addEventListener('hardwareBackPress', handleBackButton);
     return () => {
-      BackHandler.removeEventListener('hardwareBackPress', handleBackButton);
+      subscription.remove();
     };
   }, [canGoBack]);
 
@@ -49,6 +49,12 @@ export default function App() {
         domStorageEnabled={true}
         // 하단 탭바 겹침 방지를 위해 스크롤 바운스 제거 (옵션)
         bounces={false}
+        onPermissionRequest={(request) => {
+          request.grant(request.resources);
+        }}
+        allowsInlineMediaPlayback={true}
+        mediaPlaybackRequiresUserAction={false}
+        mediaCapturePermissionGrantType="grantIfSameHostElsePrompt"
       />
     </SafeAreaView>
   );

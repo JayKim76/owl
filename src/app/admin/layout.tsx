@@ -1,21 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Users, FileText, ArrowLeft, Settings, Bell, LogOut } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { LayoutDashboard, Users, FileText, ArrowLeft, Bell, LogOut, UserCog } from "lucide-react";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
-
-  const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
-    router.refresh();
-  };
 
   const navItems = [
     { name: "대시보드 홈", href: "/admin", icon: LayoutDashboard },
+    { name: "업체관리", href: "/admin/users", icon: UserCog },
     { name: "견적 관리", href: "/admin/estimates", icon: FileText },
     { name: "고객 관리", href: "/admin/customers", icon: Users },
   ];
@@ -60,10 +54,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <ArrowLeft size={18} />
             <span>앱으로 돌아가기</span>
           </Link>
-          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-all text-left">
-            <LogOut size={18} />
-            <span>로그아웃</span>
-          </button>
+          <form action="/api/auth/logout" method="post">
+            <button type="submit" className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-all text-left">
+              <LogOut size={18} />
+              <span>로그아웃</span>
+            </button>
+          </form>
         </div>
       </aside>
 

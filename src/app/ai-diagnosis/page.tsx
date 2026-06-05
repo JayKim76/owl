@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Sparkles, ArrowLeft, Upload, Camera, Trash2, CheckCircle2, ChevronRight, Share2, Wrench, AlertTriangle, Play, HelpCircle } from 'lucide-react';
+import { Sparkles, ArrowLeft, Upload, Camera, Trash2, CheckCircle2, ChevronRight, Share2, Wrench, AlertTriangle, Play, HelpCircle, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 
 // Sample Leak Image (SVG Base64 representation of a realistic leak stain for zero-friction testing)
@@ -50,6 +50,115 @@ export default function AIDiagnosisPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageContainerRef = useRef<HTMLDivElement>(null);
+
+  // 실시간 카메라 (웹캠) 촬영 상태 관리
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // 컴포넌트 언마운트 시 미디어 스트림 명시적 해제
+  useEffect(() => {
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [cameraStream]);
+
+  // cameraStream이 변경될 때마다 video 엘리먼트에 안전하게 연결
+  // (isCameraActive로 모달이 렌더링된 이후에 videoRef가 유효해지기 때문)
+  useEffect(() => {
+    if (cameraStream && videoRef.current) {
+      videoRef.current.srcObject = cameraStream;
+      videoRef.current.play().catch(() => {
+        // autoplay 정책에 의해 play()가 실패할 경우 무시 (playsInline + muted로 대부분 해결됨)
+      });
+    }
+  }, [cameraStream, isCameraActive]);
+
+  // 실시간 카메라 작동 개시
+  const startCamera = async (mode: 'user' | 'environment' = facingMode) => {
+    // 기존 스트림이 있으면 먼저 종료
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      setCameraStream(null);
+    }
+    
+    try {
+      const constraints = {
+        video: {
+          facingMode: mode,
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      };
+      
+      // 스트림을 먼저 획득한 뒤에 모달을 열어야 videoRef가 유효함
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      setCameraStream(stream);
+      setIsCameraActive(true); // ← 스트림 획득 성공 후에 모달 오픈
+    } catch (err: any) {
+      console.warn("실시간 웹캠 연결에 실패하여 기기 기본 카메라 앱 폴백을 시도합니다:", err);
+      setIsCameraActive(false);
+      setCameraStream(null);
+      
+      // 모바일 웹 및 데스크톱 권한 거부 시 네이티브 카메라 촬영 기능 강제 발동
+      showToast("카메라 구동 실패로 파일 선택/기기 카메라를 켭니다.");
+      if (fileInputRef.current) {
+        fileInputRef.current.setAttribute('capture', 'environment');
+        fileInputRef.current.click();
+      }
+    }
+  };
+
+  // 실시간 카메라 종료
+  const stopCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      setCameraStream(null);
+    }
+    setIsCameraActive(false);
+  };
+
+  // 비디오 화면 찰칵 캡처하여 업로드
+  const capturePhoto = () => {
+    if (videoRef.current && cameraStream) {
+      const video = videoRef.current;
+      const canvas = document.createElement('canvas');
+      
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        // 전면 셀카 촬영 시 거울 효과 자연스럽게 대칭 반전
+        if (facingMode === 'user') {
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+        }
+        
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+        
+        setImageSrc(dataUrl);
+        setTargetPoint(null);
+        setStep('target');
+        
+        stopCamera();
+      }
+    }
+  };
+
+  // 전면/후면 카메라 전환
+  const toggleCamera = () => {
+    const nextMode = facingMode === 'user' ? 'environment' : 'user';
+    setFacingMode(nextMode);
+    if (isCameraActive) {
+      startCamera(nextMode);
+    }
+  };
 
   // Auto transition for scanner log ticks
   useEffect(() => {
@@ -244,27 +353,52 @@ export default function AIDiagnosisPage() {
                 </p>
               </div>
 
-              {/* Upload box */}
-              <div 
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full border-2 border-dashed border-gray-300 hover:border-blue-500 rounded-3xl p-8 flex flex-col items-center justify-center gap-3 bg-gray-50 hover:bg-blue-50/30 transition-all cursor-pointer group"
-              >
-                <div className="w-12 h-12 rounded-full bg-white text-gray-400 group-hover:text-blue-500 shadow-sm flex items-center justify-center transition-colors">
-                  <Upload size={22} />
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-semibold text-gray-700">사진 올리기</p>
-                  <p className="text-xs text-gray-400 mt-1">드래그 앤 드롭 또는 파일 선택</p>
-                </div>
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  onChange={handleFileChange} 
-                  accept="image/*" 
-                  capture="environment" 
-                  className="hidden" 
-                />
+              {/* 2분할 대칭 Grid 업로드 & 카메라 레이아웃 */}
+              <div className="w-full grid grid-cols-2 gap-4">
+                {/* 1. 사진 보관함 선택 버튼 */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (fileInputRef.current) {
+                      fileInputRef.current.removeAttribute('capture');
+                      fileInputRef.current.click();
+                    }
+                  }}
+                  className="border-2 border-dashed border-gray-300 hover:border-blue-500 rounded-3xl p-6 flex flex-col items-center justify-center gap-3 bg-gray-50 hover:bg-blue-50/30 transition-all cursor-pointer group text-center"
+                >
+                  <div className="w-12 h-12 rounded-full bg-white text-gray-400 group-hover:text-blue-500 shadow-sm flex items-center justify-center transition-colors">
+                    <Upload size={22} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700">사진 보관함</p>
+                    <p className="text-[11px] text-gray-400 mt-1">보관된 사진 선택</p>
+                  </div>
+                </button>
+
+                {/* 2. 카메라 촬영 버튼 */}
+                <button
+                  type="button"
+                  onClick={() => startCamera('environment')}
+                  className="border-2 border-dashed border-gray-300 hover:border-blue-500 rounded-3xl p-6 flex flex-col items-center justify-center gap-3 bg-gray-50 hover:bg-blue-50/30 transition-all cursor-pointer group text-center"
+                >
+                  <div className="w-12 h-12 rounded-full bg-white text-gray-400 group-hover:text-blue-500 shadow-sm flex items-center justify-center transition-colors">
+                    <Camera size={22} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700">카메라 촬영</p>
+                    <p className="text-[11px] text-gray-400 mt-1">실시간 사진 촬영</p>
+                  </div>
+                </button>
               </div>
+              
+              {/* 숨겨진 파일 인풋 */}
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileChange} 
+                accept="image/*" 
+                className="hidden" 
+              />
 
               <div className="w-full flex items-center gap-3">
                 <div className="flex-1 h-px bg-gray-200"></div>
@@ -533,6 +667,77 @@ export default function AIDiagnosisPage() {
             Owl Leak AI Core v4.12 · Deep Learning Vision Model
           </p>
         </footer>
+
+        {/* 실시간 카메라 모달 오버레이 (Camera Modal Overlay) */}
+        {isCameraActive && (
+          <div className="absolute inset-0 z-50 bg-black flex flex-col justify-between">
+            {/* 탑 네비게이션 헤더 */}
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-b from-black/80 to-transparent">
+              <button 
+                onClick={stopCamera} 
+                className="text-white hover:text-gray-300 p-2 rounded-full bg-black/40 backdrop-blur-sm transition-colors animate-pulse"
+                aria-label="카메라 닫기"
+              >
+                <ArrowLeft size={20} />
+              </button>
+              <span className="text-white text-sm font-bold tracking-wide">실시간 누수 촬영</span>
+              <button 
+                onClick={toggleCamera} 
+                className="text-white hover:text-gray-300 p-2 rounded-full bg-black/40 backdrop-blur-sm transition-colors"
+                aria-label="카메라 전환"
+              >
+                <RefreshCw size={20} />
+              </button>
+            </div>
+
+            {/* 비디오 뷰파인더 프레임 */}
+            <div className="flex-1 relative flex items-center justify-center bg-zinc-950 overflow-hidden">
+              <video 
+                ref={videoRef} 
+                autoPlay 
+                playsInline 
+                muted 
+                className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`} 
+              />
+              
+              {/* 누수 촬영 가이드라인 사각형 뷰파인더 */}
+              <div className="absolute w-64 h-64 border-2 border-white/60 rounded-3xl pointer-events-none flex items-center justify-center">
+                <div className="w-60 h-60 border border-white/20 border-dashed rounded-2xl flex items-center justify-center">
+                  <span className="text-[10px] text-white/50 font-medium bg-black/50 px-2 py-0.5 rounded-full">의심 부위를 사각형 안에 맞춰주세요</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 하단 제어부 */}
+            <div className="px-6 py-8 bg-gradient-to-t from-black to-zinc-950/80 flex items-center justify-around">
+              {/* 취소 버튼 */}
+              <button 
+                onClick={stopCamera}
+                className="text-white hover:text-gray-300 text-xs font-semibold px-4 py-2.5 rounded-full bg-zinc-900 border border-zinc-800 transition-colors"
+              >
+                취소
+              </button>
+
+              {/* 캡처 버튼 (큰 셔터 스타일) */}
+              <button 
+                onClick={capturePhoto}
+                className="w-16 h-16 rounded-full bg-white active:bg-zinc-200 p-1 flex items-center justify-center shadow-lg transition-transform active:scale-95 focus:outline-none"
+                aria-label="사진 촬영"
+              >
+                <div className="w-14 h-14 rounded-full border-2 border-zinc-900 bg-white" />
+              </button>
+
+              {/* 카메라 전/후면 전환 버튼 */}
+              <button 
+                onClick={toggleCamera}
+                className="text-white hover:text-gray-300 text-xs font-semibold px-4 py-2.5 rounded-full bg-zinc-900 border border-zinc-800 transition-colors flex items-center gap-1.5"
+              >
+                <RefreshCw size={14} />
+                카메라 전환 (영문: Camera Transition)
+              </button>
+            </div>
+          </div>
+        )}
 
       </main>
     </div>

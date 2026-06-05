@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate"
@@ -12,6 +12,7 @@
   "dependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",
     "@prisma/client": "^6.4.1",
+    "@supabase/supabase-js": "^2.106.0",
     "jose": "^6.2.3",
     "lucide-react": "^1.7.0",
     "next": "16.2.2",

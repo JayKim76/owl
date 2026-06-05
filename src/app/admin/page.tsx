@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import { Users, FileText, TrendingUp, AlertCircle } from "lucide-react";
+import { Users, FileText, TrendingUp, UserCog } from "lucide-react";
 import Link from "next/link";
 
 export const dynamic = 'force-dynamic'; // Always fetch fresh data
@@ -8,10 +8,12 @@ export default async function AdminDashboard() {
   // Fetch stats concurrently
   const [
     totalCustomers,
+    totalGeneralUsers,
     totalEstimates,
     recentEstimates
   ] = await Promise.all([
     prisma.customer.count(),
+    prisma.generalUser.count(),
     prisma.estimate.count(),
     prisma.estimate.findMany({
       take: 5,
@@ -31,9 +33,9 @@ export default async function AdminDashboard() {
 
   const statsCards = [
     { title: "총 고객 수", value: `${totalCustomers}명`, icon: Users, color: "text-blue-600", bg: "bg-blue-100" },
+    { title: "일반 사용자 계정", value: `${totalGeneralUsers}명`, icon: UserCog, color: "text-amber-600", bg: "bg-amber-100" },
     { title: "누적 견적 건수", value: `${totalEstimates}건`, icon: FileText, color: "text-emerald-600", bg: "bg-emerald-100" },
     { title: "잠재 매출액 (최대)", value: `${new Intl.NumberFormat('ko-KR').format(totalRevenuePotential)}원`, icon: TrendingUp, color: "text-indigo-600", bg: "bg-indigo-100" },
-    { title: "긴급 요망", value: "0건", icon: AlertCircle, color: "text-rose-600", bg: "bg-rose-100" },
   ];
 
   return (

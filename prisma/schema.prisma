@@ -8,23 +8,34 @@ datasource db {
 }
 
 model Customer {
-  id        Int        @id @default(autoincrement())
-  name      String?
-  phone     String     @unique
-  address   String?
-  createdAt DateTime   @default(now())
-  estimates Estimate[]
-  tasks     Task[]
+  id          Int        @id @default(autoincrement())
+  name        String?
+  phone       String     @unique
+  tenantPhone String?
+  victimPhone String?
+  address     String?
+  createdAt   DateTime   @default(now())
+  estimates   Estimate[]
+  tasks       Task[]
 }
 
 model Partner {
-  id          Int      @id @default(autoincrement())
-  companyName String
-  contactName String?
-  phone       String
-  specialty   String?
-  createdAt   DateTime @default(now())
-  tasks       Task[]
+  id            Int          @id @default(autoincrement())
+  companyName   String
+  contactName   String?
+  phone         String       @unique
+  specialty     String?
+  email         String?
+  region        String?
+  partnerCode   String?      @unique
+  status        String       @default("pending")
+  rating        Int          @default(0)
+  completedJobs Int          @default(0)
+  memo          String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  tasks         Task[]
+  generalUser   GeneralUser?
 }
 
 model Estimate {
@@ -84,4 +95,27 @@ model Task {
   
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+}
+
+model AdminUser {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique @default("admin")
+  passwordHash String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model GeneralUser {
+  id           Int      @id @default(autoincrement())
+  name         String
+  phone        String?  @unique
+  passwordHash String
+  memo         String?
+  isActive     Boolean  @default(true)
+  lastLogin    DateTime?
+  partnerId    Int?     @unique
+  partner      Partner? @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }

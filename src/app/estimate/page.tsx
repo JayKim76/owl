@@ -108,9 +108,8 @@ export default function EstimateChecklistPage() {
     const cost = currentCosts[workName] ?? INITIAL_DEFAULT_COSTS[workName] ?? 0;
     addedCost += cost;
   });
-  const totalMin = minCost + addedCost;
-  const totalMax = totalMin + (totalMin * 0.2);
-  const estimatedPrice = `${new Intl.NumberFormat('ko-KR').format(totalMin)}원 ~ ${new Intl.NumberFormat('ko-KR').format(totalMax)}원`;
+  const totalCost = minCost + addedCost;
+  const estimatedPrice = `${new Intl.NumberFormat('ko-KR').format(totalCost)}원`;
 
   // 활성 템플릿 로드
   useEffect(() => {
@@ -569,7 +568,7 @@ export default function EstimateChecklistPage() {
                 <p className="text-3xl font-black text-slate-900 tracking-tighter">{estimatedPrice}</p>
                 <div className="bg-white/60 p-3 rounded-xl mt-4 text-left">
                   <p className="text-xs text-yellow-800 font-medium leading-relaxed">
-                    * 기본 탐지비 {new Intl.NumberFormat('ko-KR').format(parseInt(detectionFee) || 0)}원에 필요 작업({requiredWorks.length}건) 비용이 합산된 대략적인 금액입니다.<br/>
+                    * 기본 탐지비 {new Intl.NumberFormat('ko-KR').format(parseInt(detectionFee) || 0)}원에 필요 작업({requiredWorks.length}건) 비용이 합산된 예상 금액입니다.<br/>
                     * 현장의 실제 상황이나 마감재 종류에 따라 비용이 추가될 수 있습니다.
                   </p>
                 </div>

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Script from "next/script";
 import Link from "next/link";
-import { ArrowLeft, Calculator, CheckCircle2, ChevronDown, ChevronUp, Settings, FileText } from "lucide-react";
+import { ArrowLeft, Calculator, CheckCircle2, ChevronDown, ChevronUp, Settings, FileText, Upload } from "lucide-react";
 
 declare global {
   interface Window {
@@ -100,6 +100,7 @@ export default function EstimateChecklistPage() {
   const [activeTemplate, setActiveTemplate] = useState<EstimateTemplate | null>(null);
   const [showTemplateRef, setShowTemplateRef] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewTab, setPreviewTab] = useState<'custom' | 'default'>('custom');
 
   // 🦉 견적 금액 자동 계산 (파생 상태)
   const minCost = parseInt(detectionFee) || 0;
@@ -723,6 +724,7 @@ export default function EstimateChecklistPage() {
         {isPreviewOpen && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
             <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+              {/* 모달 헤더 */}
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50 rounded-t-2xl">
                 <div className="flex items-center gap-2 text-gray-800 font-bold">
                   <FileText size={20} className="text-blue-600" />
@@ -732,97 +734,206 @@ export default function EstimateChecklistPage() {
                   ✕
                 </button>
               </div>
-              
+
+              {/* 탭 선택기 */}
+              <div className="flex border-b border-gray-100 bg-gray-50">
+                <button
+                  onClick={() => setPreviewTab('custom')}
+                  className={`flex-1 py-3 text-sm font-bold transition-colors flex items-center justify-center gap-1.5 ${
+                    previewTab === 'custom'
+                      ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
+                      : 'text-gray-400 hover:text-gray-600'
+                  }`}
+                >
+                  <Upload size={14} />
+                  {activeTemplate?.fileUrl ? '내 양식' : '나만의 양식 없음'}
+                </button>
+                <button
+                  onClick={() => setPreviewTab('default')}
+                  className={`flex-1 py-3 text-sm font-bold transition-colors flex items-center justify-center gap-1.5 ${
+                    previewTab === 'default'
+                      ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
+                      : 'text-gray-400 hover:text-gray-600'
+                  }`}
+                >
+                  <FileText size={14} />
+                  기본 양식
+                </button>
+              </div>
+
               <div className="flex-1 overflow-y-auto p-6 bg-gray-100">
-                {/* 견적서 A4 느낌 래퍼 */}
-                <div className="bg-white mx-auto shadow-sm border border-gray-200 p-8 sm:p-10 rounded text-gray-800 text-sm font-sans relative">
-                  
-                  {/* 워터마크 느낌 */}
-                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 opacity-5 pointer-events-none">
-                    <span className="text-8xl font-black tracking-tighter">OWL LAB</span>
-                  </div>
 
-                  <h1 className="text-2xl sm:text-3xl font-black text-center mb-8 tracking-tighter text-slate-900 border-b-2 border-slate-900 pb-4">
-                    누수 탐지 및 공사 견적서
-                  </h1>
-
-                  <div className="flex justify-between items-end mb-6 text-xs text-gray-500 font-medium">
-                    <div>
-                      <p>작성일: {new Date().toLocaleDateString('ko-KR')}</p>
-                      <p>고객 연락처: {customerPhone || "미지정"}</p>
+                {/* ===== 내 양식 탭 ===== */}
+                {previewTab === 'custom' && (
+                  activeTemplate?.fileUrl ? (
+                    <div className="relative bg-white mx-auto shadow-sm border border-gray-200 rounded overflow-hidden">
+                      {/* 업로드된 이미지 양식 */}
+                      {activeTemplate.fileUrl.toLowerCase().endsWith('.pdf') ? (
+                        <div className="p-8 text-center">
+                          <FileText size={48} className="mx-auto text-blue-400 mb-3" />
+                          <p className="text-sm font-bold text-gray-700 mb-1">업로드된 PDF 양식</p>
+                          <p className="text-xs text-gray-500 mb-4">PDF 양식 위에 데이터를 오버레이하여 표시합니다.</p>
+                          {/* PDF 입력 데이터 요약 표 */}
+                          <div className="text-left text-sm space-y-2 border border-gray-200 rounded-xl p-4 bg-gray-50">
+                            <p><span className="font-bold text-gray-600">&#128205; 누수 위치:</span> {basicInfo.leakLocation || '-'}</p>
+                            <p><span className="font-bold text-gray-600">&#128273; 필요 작업:</span> {requiredWorks.join(', ') || '없음'}</p>
+                            <p><span className="font-bold text-gray-600">&#128176; 총 예상 견적:</span> <span className="text-blue-700 font-black text-lg">{estimatedPrice}</span></p>
+                            <p><span className="font-bold text-gray-600">&#128203; 탐지 내용:</span> {detectionDetails || '-'}</p>
+                          </div>
+                          <a href={activeTemplate.fileUrl} target="_blank" rel="noopener noreferrer"
+                            className="mt-4 inline-flex items-center gap-2 text-xs text-blue-600 hover:underline">
+                            <FileText size={12} /> PDF 양식 열기
+                          </a>
+                        </div>
+                      ) : (
+                        <div className="relative">
+                          {/* 이미지 양식 배경 */}
+                          <img
+                            src={activeTemplate.fileUrl}
+                            alt="견적서 양식"
+                            className="w-full block"
+                          />
+                          {/* 데이터 오버레이 커드 */}
+                          <div className="absolute inset-0 flex flex-col justify-end p-4 sm:p-6">
+                            <div className="bg-white/90 backdrop-blur-sm border border-gray-200 rounded-2xl shadow-xl p-4 sm:p-5 space-y-2">
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">입력 데이터</p>
+                              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                                <div>
+                                  <span className="text-gray-500 font-medium">작성일</span>
+                                  <p className="font-bold text-gray-800">{new Date().toLocaleDateString('ko-KR')}</p>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500 font-medium">고객연락처</span>
+                                  <p className="font-bold text-gray-800">{customerPhone || '미지정'}</p>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500 font-medium">누수 위치</span>
+                                  <p className="font-bold text-gray-800">{basicInfo.leakLocation || '-'}</p>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500 font-medium">긴급도</span>
+                                  <p className="font-bold text-gray-800">{basicInfo.urgency || '-'}</p>
+                                </div>
+                                <div className="col-span-2">
+                                  <span className="text-gray-500 font-medium">필요 작업</span>
+                                  <p className="font-bold text-gray-800">{requiredWorks.join(', ') || '없음'}</p>
+                                </div>
+                                <div className="col-span-2">
+                                  <span className="text-gray-500 font-medium">탐지 내용</span>
+                                  <p className="font-bold text-gray-800 text-[11px] leading-relaxed">{detectionDetails || '-'}</p>
+                                </div>
+                              </div>
+                              <div className="pt-2 border-t border-gray-200 flex items-center justify-between">
+                                <span className="text-xs font-bold text-gray-600">총 예상 견적 (VAT 별도)</span>
+                                <span className="text-xl font-black text-blue-700">{estimatedPrice}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="text-right">
-                      <p className="font-bold text-gray-700">부엉이 누수탐지 랩</p>
-                      <p>사업자등록번호: 123-45-67890</p>
+                  ) : (
+                    /* 업로드된 양식 없음 안내 */
+                    <div className="bg-white mx-auto rounded-2xl border-2 border-dashed border-gray-200 p-10 text-center flex flex-col items-center gap-3">
+                      <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center">
+                        <Upload size={28} className="text-blue-400" />
+                      </div>
+                      <p className="font-bold text-gray-700">등록된 나만의 양식이 없습니다</p>
+                      <p className="text-sm text-gray-400 max-w-xs leading-relaxed">
+                        설정 &gt; 견적 양식에서 나만의 양식 이미지를 업로드하고<br/>
+                        기본값으로 설정하면 이곣에 표시됩니다.
+                      </p>
+                      <a href="/settings" className="mt-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-colors shadow-md">
+                        양식 업로드 하러가기 →
+                      </a>
                     </div>
-                  </div>
+                  )
+                )}
 
-                  <div className="mb-6 rounded border border-gray-300 overflow-hidden">
-                    <table className="w-full text-left border-collapse">
-                      <tbody>
-                        {fieldVisible('leakLocation') && (
+                {/* ===== 기본 양식 탭 ===== */}
+                {previewTab === 'default' && (
+                  <div className="bg-white mx-auto shadow-sm border border-gray-200 p-8 sm:p-10 rounded text-gray-800 text-sm font-sans relative">
+                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 opacity-5 pointer-events-none">
+                      <span className="text-8xl font-black tracking-tighter">OWL LAB</span>
+                    </div>
+                    <h1 className="text-2xl sm:text-3xl font-black text-center mb-8 tracking-tighter text-slate-900 border-b-2 border-slate-900 pb-4">
+                      누수 탐지 및 공사 견적서
+                    </h1>
+                    <div className="flex justify-between items-end mb-6 text-xs text-gray-500 font-medium">
+                      <div>
+                        <p>작성일: {new Date().toLocaleDateString('ko-KR')}</p>
+                        <p>고객 연락처: {customerPhone || "미지정"}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-gray-700">부엉이 누수탐지 랩</p>
+                        <p>사업자등록번호: 123-45-67890</p>
+                      </div>
+                    </div>
+                    <div className="mb-6 rounded border border-gray-300 overflow-hidden">
+                      <table className="w-full text-left border-collapse">
+                        <tbody>
+                          {fieldVisible('leakLocation') && (
+                            <tr className="border-b border-gray-200">
+                              <th className="bg-gray-50 py-3 px-4 font-bold text-gray-700 w-1/3 border-r border-gray-200">{fieldLabel('leakLocation', '현장 및 누수 위치')}</th>
+                              <td className="py-3 px-4 font-medium text-gray-900">{basicInfo.leakLocation || "-"}</td>
+                            </tr>
+                          )}
+                          {fieldVisible('leakAmount') && (
+                            <tr className="border-b border-gray-200">
+                              <th className="bg-gray-50 py-3 px-4 font-bold text-gray-700 border-r border-gray-200">{fieldLabel('leakAmount', '누수 상태')}</th>
+                              <td className="py-3 px-4 font-medium text-gray-900">{basicInfo.leakAmount || "-"}</td>
+                            </tr>
+                          )}
                           <tr className="border-b border-gray-200">
-                            <th className="bg-gray-50 py-3 px-4 font-bold text-gray-700 w-1/3 border-r border-gray-200">{fieldLabel('leakLocation', '현장 및 누수 위치')}</th>
-                            <td className="py-3 px-4 font-medium text-gray-900">{basicInfo.leakLocation || "-"}</td>
+                            <th className="bg-gray-50 py-3 px-4 font-bold text-gray-700 border-r border-gray-200">피해 장소</th>
+                            <td className="py-3 px-4 font-medium text-gray-900">
+                              {[...damageAreas, customDamageArea].filter(Boolean).join(", ") || "-"}
+                            </td>
                           </tr>
-                        )}
-                        {fieldVisible('leakAmount') && (
+                          <tr>
+                            <th className="bg-gray-50 py-3 px-4 font-bold text-gray-700 border-r border-gray-200">탐지 내용 요약</th>
+                            <td className="py-3 px-4 font-medium text-gray-900 whitespace-pre-wrap">{detectionDetails || "상세 점검 필요"}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                    <h2 className="font-bold text-slate-800 mb-2 border-l-4 border-blue-600 pl-2">상세 내역</h2>
+                    <div className="mb-8 rounded border border-gray-300 overflow-hidden">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-slate-100 border-b border-gray-300">
+                            <th className="py-2.5 px-4 font-bold text-slate-700 border-r border-gray-200">구분</th>
+                            <th className="py-2.5 px-4 font-bold text-slate-700 text-right">예상 금액</th>
+                          </tr>
+                        </thead>
+                        <tbody>
                           <tr className="border-b border-gray-200">
-                            <th className="bg-gray-50 py-3 px-4 font-bold text-gray-700 border-r border-gray-200">{fieldLabel('leakAmount', '누수 상태')}</th>
-                            <td className="py-3 px-4 font-medium text-gray-900">{basicInfo.leakAmount || "-"}</td>
+                            <td className="py-3 px-4 text-gray-800 border-r border-gray-200">기본 누수 탐지비</td>
+                            <td className="py-3 px-4 font-medium text-right text-gray-900">{new Intl.NumberFormat('ko-KR').format(parseInt(detectionFee) || 0)}원</td>
                           </tr>
-                        )}
-                        <tr className="border-b border-gray-200">
-                          <th className="bg-gray-50 py-3 px-4 font-bold text-gray-700 border-r border-gray-200">피해 장소</th>
-                          <td className="py-3 px-4 font-medium text-gray-900">
-                            {[...damageAreas, customDamageArea].filter(Boolean).join(", ") || "-"}
-                          </td>
-                        </tr>
-                        <tr>
-                          <th className="bg-gray-50 py-3 px-4 font-bold text-gray-700 border-r border-gray-200">탐지 내용 요약</th>
-                          <td className="py-3 px-4 font-medium text-gray-900 whitespace-pre-wrap">{detectionDetails || "상세 점검 필요"}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <h2 className="font-bold text-slate-800 mb-2 border-l-4 border-blue-600 pl-2">상세 내역</h2>
-                  <div className="mb-8 rounded border border-gray-300 overflow-hidden">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="bg-slate-100 border-b border-gray-300">
-                          <th className="py-2.5 px-4 font-bold text-slate-700 border-r border-gray-200">구분</th>
-                          <th className="py-2.5 px-4 font-bold text-slate-700 text-right">예상 금액</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr className="border-b border-gray-200">
-                          <td className="py-3 px-4 text-gray-800 border-r border-gray-200">기본 누수 탐지비</td>
-                          <td className="py-3 px-4 font-medium text-right text-gray-900">{new Intl.NumberFormat('ko-KR').format(parseInt(detectionFee) || 0)}원</td>
-                        </tr>
-                        {requiredWorks.map(work => (
-                          <tr key={work} className="border-b border-gray-200">
-                            <td className="py-3 px-4 text-gray-800 border-r border-gray-200">{work}</td>
-                            <td className="py-3 px-4 font-medium text-right text-gray-900">{new Intl.NumberFormat('ko-KR').format(currentCosts[work] || 0)}원</td>
+                          {requiredWorks.map(work => (
+                            <tr key={work} className="border-b border-gray-200">
+                              <td className="py-3 px-4 text-gray-800 border-r border-gray-200">{work}</td>
+                              <td className="py-3 px-4 font-medium text-right text-gray-900">{new Intl.NumberFormat('ko-KR').format(currentCosts[work] || 0)}원</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="bg-blue-50/50">
+                            <th className="py-4 px-4 font-black text-blue-900 border-r border-gray-200">총 예상 견적 (VAT 별도)</th>
+                            <td className="py-4 px-4 font-black text-right text-blue-900 text-lg">{estimatedPrice}</td>
                           </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr className="bg-blue-50/50">
-                          <th className="py-4 px-4 font-black text-blue-900 border-r border-gray-200">총 예상 견적 (VAT 별도)</th>
-                          <td className="py-4 px-4 font-black text-right text-blue-900 text-lg">{estimatedPrice}</td>
-                        </tr>
-                      </tfoot>
-                    </table>
+                        </tfoot>
+                      </table>
+                    </div>
+                    <p className="text-xs text-gray-500 leading-relaxed mt-4">
+                      * 위 금액은 1차 탐지 및 육안/청음 진단에 따른 <strong className="text-gray-700">예상 견적</strong>이며, 굴착 등 실제 시공 시 내부 배관 상태나 구조적 문제에 따라 금액이 변동될 수 있습니다.<br/>
+                      * 부가가치세(VAT)는 별도입니다.<br/>
+                      * 시공 완료 후 1년간 무상 하자보수(A/S)를 보장합니다.
+                    </p>
                   </div>
+                )}
 
-                  <p className="text-xs text-gray-500 leading-relaxed mt-4">
-                    * 위 금액은 1차 탐지 및 육안/청음 진단에 따른 <strong className="text-gray-700">예상 견적</strong>이며, 굴착 등 실제 시공 시 내부 배관 상태나 구조적 문제에 따라 금액이 변동될 수 있습니다.<br/>
-                    * 부가가치세(VAT)는 별도입니다.<br/>
-                    * 시공 완료 후 1년간 무상 하자보수(A/S)를 보장합니다.
-                  </p>
-
-                </div>
               </div>
               <div className="px-6 py-4 border-t border-gray-100 flex gap-3 bg-white rounded-b-2xl">
                 <button onClick={() => setIsPreviewOpen(false)} className="flex-1 py-3 font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors">

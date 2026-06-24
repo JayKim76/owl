@@ -1,9 +1,29 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
+
+async function getSessionInfo() {
+  const cookieStore = await cookies();
+  const adminSession = cookieStore.get('admin_session')?.value;
+  const userSession = cookieStore.get('user_session')?.value;
+
+  if (adminSession) {
+    return { isAdmin: true, userId: null };
+  }
+
+  if (userSession && userSession.startsWith('general:')) {
+    return { isAdmin: false, userId: parseInt(userSession.split(':')[1], 10) };
+  }
+
+  return { isAdmin: false, userId: null };
+}
 
 export async function GET() {
   try {
+    const { isAdmin, userId } = await getSessionInfo();
+
     const tasks = await prisma.task.findMany({
+      where: (isAdmin || !userId) ? undefined : { createdById: userId },
       include: {
         customer: true,
         estimate: true,
@@ -39,6 +59,8 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const { isAdmin, userId } = await getSessionInfo();
+
     const body = await request.json();
     const { name, phone, tenantPhone, victimPhone, region, jobType, isUrgent, detail, phase } = body;
 
@@ -68,6 +90,7 @@ export async function POST(request: Request) {
         status: dbStatus,
         customerId: customer.id,
         estimateId: estimate.id,
+        createdById: userId,
       },
       include: {
         customer: true,

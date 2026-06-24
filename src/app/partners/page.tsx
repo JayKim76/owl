@@ -149,6 +149,7 @@ export default function PartnersPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<PartnerStatus | "all">("all");
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // 폼 상태
   const [formData, setFormData] = useState({
@@ -215,6 +216,7 @@ export default function PartnersPage() {
   };
 
   useEffect(() => {
+    setIsAdmin(document.cookie.includes('admin_session'));
     loadPartners();
   }, []);
 
@@ -223,7 +225,7 @@ export default function PartnersPage() {
     e.preventDefault();
     setErrorMessage("");
     if (!formData.companyName || !formData.manager || !formData.phone) return;
-    if (!isEditing && !formData.password) {
+    if (isAdmin && !isEditing && !formData.password) {
       setErrorMessage("협력사와 함께 생성할 일반 사용자 로그인 비밀번호를 입력해주세요.");
       return;
     }
@@ -564,22 +566,24 @@ export default function PartnersPage() {
                 </div>
 
                 {/* 일반 사용자 로그인 비밀번호 */}
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 mb-1.5 ml-1">
-                    일반 사용자 로그인 비밀번호 {isEditing ? "(변경 시 입력)" : "*"}
-                  </label>
-                  <input
-                    type="password"
-                    required={!isEditing}
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    placeholder={isEditing ? "비워두면 기존 비밀번호 유지" : "협력사 로그인 비밀번호"}
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all text-sm"
-                  />
-                  <p className="text-[11px] text-gray-400 mt-1 ml-1">
-                    협력사 등록 시 같은 연락처의 일반 사용자 계정이 함께 생성됩니다.
-                  </p>
-                </div>
+                {isAdmin && (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 mb-1.5 ml-1">
+                      일반 사용자 로그인 비밀번호 {isEditing ? "(변경 시 입력)" : "*"}
+                    </label>
+                    <input
+                      type="password"
+                      required={!isEditing}
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      placeholder={isEditing ? "비워두면 기존 비밀번호 유지" : "협력사 로그인 비밀번호"}
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all text-sm"
+                    />
+                    <p className="text-[11px] text-gray-400 mt-1 ml-1">
+                      협력사 등록 시 같은 연락처의 일반 사용자 계정이 함께 생성됩니다.
+                    </p>
+                  </div>
+                )}
 
                 {/* 이메일 */}
                 <div>

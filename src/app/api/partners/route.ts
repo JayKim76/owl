@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import prisma from '@/lib/prisma';
 import { hashPassword } from '@/lib/password';
 
@@ -44,8 +45,47 @@ function toPartnerResponse(partner: {
   };
 }
 
+async function getSessionInfo() {
+  const cookieStore = await cookies();
+  const adminSession = cookieStore.get('admin_session')?.value;
+  const userSession = cookieStore.get('user_session')?.value;
+
+  if (adminSession) {
+    return { isAdmin: true, userId: null };
+  }
+
+  if (userSession && userSession.startsWith('general:')) {
+    return { isAdmin: false, userId: parseInt(userSession.split(':')[1], 10) };
+  }
+
+  return { isAdmin: false, userId: null };
+}
+
 export async function GET() {
+  const { isAdmin, userId } = await getSessionInfo();
+
+  if (!isAdmin && !userId) {
+    return NextResponse.json([]);
+  }
+
+  let userPartnerId: number | null = null;
+  if (!isAdmin && userId) {
+    const user = await prisma.generalUser.findUnique({
+      where: { id: userId },
+      select: { partnerId: true }
+    });
+    userPartnerId = user?.partnerId || null;
+  }
+
   const partners = await prisma.partner.findMany({
+    where: isAdmin 
+      ? undefined 
+      : { 
+          OR: [
+            { createdById: userId },
+            ...(userPartnerId ? [{ id: userPartnerId }] : [])
+          ]
+        },
     orderBy: { createdAt: 'desc' },
   });
 
@@ -135,6 +175,8 @@ async function generatePartnerCode(region: string | null, type: string) {
 }
 
 export async function POST(request: Request) {
+  const { isAdmin, userId } = await getSessionInfo();
+
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   if (!body) {
     return NextResponse.json({ error: 'invalid-json' }, { status: 400 });
@@ -153,7 +195,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'required-fields' }, { status: 400 });
   }
 
-  if (!password) {
+  if (isAdmin && !password) {
     return NextResponse.json({ error: 'password-required' }, { status: 400 });
   }
 
@@ -172,27 +214,30 @@ export async function POST(request: Request) {
           partnerCode: generatedPartnerCode,
           memo,
           status: 'pending',
+          createdById: userId,
         },
       });
 
-      await tx.generalUser.upsert({
-        where: { phone },
-        create: {
-          name: manager,
-          phone,
-          passwordHash: hashPassword(password),
-          memo: [companyName, type, region, memo].filter(Boolean).join(' / ') || null,
-          isActive: true,
-          partnerId: createdPartner.id,
-        },
-        update: {
-          name: manager,
-          passwordHash: hashPassword(password),
-          memo: [companyName, type, region, memo].filter(Boolean).join(' / ') || null,
-          isActive: true,
-          partnerId: createdPartner.id,
-        },
-      });
+      if (isAdmin) {
+        await tx.generalUser.upsert({
+          where: { phone },
+          create: {
+            name: manager,
+            phone,
+            passwordHash: hashPassword(password!),
+            memo: [companyName, type, region, memo].filter(Boolean).join(' / ') || null,
+            isActive: true,
+            partnerId: createdPartner.id,
+          },
+          update: {
+            name: manager,
+            passwordHash: hashPassword(password!),
+            memo: [companyName, type, region, memo].filter(Boolean).join(' / ') || null,
+            isActive: true,
+            partnerId: createdPartner.id,
+          },
+        });
+      }
 
       return createdPartner;
     });
@@ -205,6 +250,8 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  const { isAdmin } = await getSessionInfo();
+
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   if (!body) {
     return NextResponse.json({ error: 'invalid-json' }, { status: 400 });
@@ -243,24 +290,26 @@ export async function PUT(request: Request) {
         },
       });
 
-      await tx.generalUser.upsert({
-        where: { phone },
-        create: {
-          name: manager,
-          phone,
-          passwordHash: hashPassword(password || '1234'),
-          memo: [companyName, type, region, memo].filter(Boolean).join(' / ') || null,
-          isActive: updatedPartner.status !== 'inactive',
-          partnerId: updatedPartner.id,
-        },
-        update: {
-          name: manager,
-          memo: [companyName, type, region, memo].filter(Boolean).join(' / ') || null,
-          isActive: updatedPartner.status !== 'inactive',
-          partnerId: updatedPartner.id,
-          ...(password ? { passwordHash: hashPassword(password) } : {}),
-        },
-      });
+      if (isAdmin) {
+        await tx.generalUser.upsert({
+          where: { phone },
+          create: {
+            name: manager,
+            phone,
+            passwordHash: hashPassword(password || '1234'),
+            memo: [companyName, type, region, memo].filter(Boolean).join(' / ') || null,
+            isActive: updatedPartner.status !== 'inactive',
+            partnerId: updatedPartner.id,
+          },
+          update: {
+            name: manager,
+            ...(password ? { passwordHash: hashPassword(password) } : {}),
+            memo: [companyName, type, region, memo].filter(Boolean).join(' / ') || null,
+            isActive: updatedPartner.status !== 'inactive',
+            partnerId: updatedPartner.id,
+          },
+        });
+      }
 
       return updatedPartner;
     });

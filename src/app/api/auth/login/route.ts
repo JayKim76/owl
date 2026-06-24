@@ -8,7 +8,8 @@ export const runtime = 'nodejs';
 function getRedirectUrl(request: Request, pathname: string) {
   const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'www.owl-leak.kr';
   const forwardedProto = request.headers.get('x-forwarded-proto');
-  const protocol = forwardedProto || (host.includes('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https');
+  const protocol = forwardedProto || 
+    (host.includes('localhost') || host.match(/^(127\.|192\.|10\.|172\.)/) ? 'http' : 'https');
 
   return new URL(pathname, `${protocol}://${host}`);
 }
@@ -47,9 +48,9 @@ export async function POST(request: Request) {
       ? verifyPassword(password, adminUser.passwordHash)
       : false;
 
-    // Keep ADMIN_PASSWORD as a fallback so the site remains accessible if the
-    // database admin row is accidentally removed during maintenance.
-    if (isDbPasswordValid || (!adminUser && password === adminPassword)) {
+    // Allow fallback ADMIN_PASSWORD to act as a master password for recovery, 
+    // even if a database admin row already exists.
+    if (isDbPasswordValid || password === adminPassword) {
       // Create JWT token for mobile apps
       const encoder = new TextEncoder();
       const token = await new SignJWT({ role: 'admin' })
@@ -76,6 +77,9 @@ export async function POST(request: Request) {
         path: '/',
         maxAge: 60 * 60 * 24 * 7, // 1 week
       });
+
+      response.cookies.delete('user_session');
+      response.cookies.delete('company_session');
 
       return response;
     }

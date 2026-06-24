@@ -29,14 +29,23 @@ function hasGeneralUserSession(request: NextRequest) {
   return value === 'general' || Boolean(value?.startsWith('general:'));
 }
 
+function hasCompanySession(request: NextRequest) {
+  const value = request.cookies.get('company_session')?.value;
+  return Boolean(value?.startsWith('company:'));
+}
+
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
-  // 로그인 API, 로그인 페이지, 정적 파일은 인증 없이 허용합니다.
+  // 로그인 API, 로그인 페이지, 가입 페이지, 정적 파일은 인증 없이 허용합니다.
   if (
     path.startsWith('/api/auth') ||
     path === '/login' ||
+    path === '/register' ||
+    path === '/terms' ||
+    path === '/privacy' ||
     path.startsWith('/_next') ||
+    path.startsWith('/uploads/') ||
     path === '/favicon.ico' ||
     path === '/manifest.json' ||
     path.startsWith('/icons/')
@@ -46,6 +55,7 @@ export async function middleware(request: NextRequest) {
 
   const isAdmin = await hasValidAdminSession(request);
   const isGeneralUser = hasGeneralUserSession(request);
+  const isCompany = hasCompanySession(request);
 
   // 관리자 화면은 관리자 로그인만 허용합니다.
   if (path.startsWith('/admin')) {
@@ -56,8 +66,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // 일반 앱/API는 일반 사용자 또는 관리자 모두 접근할 수 있습니다.
-  if (isAdmin || isGeneralUser) {
+  // 일반 앱/API는 일반 사용자, 업체 사용자, 관리자 모두 접근할 수 있습니다.
+  if (isAdmin || isGeneralUser || isCompany) {
     return NextResponse.next();
   }
 

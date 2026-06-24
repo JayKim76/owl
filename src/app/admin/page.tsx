@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import { Users, FileText, TrendingUp, UserCog } from "lucide-react";
+import { Users, FileText, TrendingUp, UserCog, Building2, Clock } from "lucide-react";
 import Link from "next/link";
 
 export const dynamic = 'force-dynamic'; // Always fetch fresh data
@@ -10,11 +10,13 @@ export default async function AdminDashboard() {
     totalCustomers,
     totalGeneralUsers,
     totalEstimates,
+    pendingCompanies,
     recentEstimates
   ] = await Promise.all([
     prisma.customer.count(),
     prisma.generalUser.count(),
     prisma.estimate.count(),
+    prisma.subscription.count({ where: { status: 'pending' } }),
     prisma.estimate.findMany({
       take: 5,
       orderBy: { createdAt: 'desc' },
@@ -32,10 +34,11 @@ export default async function AdminDashboard() {
   const totalRevenuePotential = estimatesAgg._sum.estimatedMaxPrice || 0;
 
   const statsCards = [
-    { title: "총 고객 수", value: `${totalCustomers}명`, icon: Users, color: "text-blue-600", bg: "bg-blue-100" },
-    { title: "일반 사용자 계정", value: `${totalGeneralUsers}명`, icon: UserCog, color: "text-amber-600", bg: "bg-amber-100" },
-    { title: "누적 견적 건수", value: `${totalEstimates}건`, icon: FileText, color: "text-emerald-600", bg: "bg-emerald-100" },
-    { title: "잠재 매출액 (최대)", value: `${new Intl.NumberFormat('ko-KR').format(totalRevenuePotential)}원`, icon: TrendingUp, color: "text-indigo-600", bg: "bg-indigo-100" },
+    { title: "총 고객 수", value: `${totalCustomers}명`, icon: Users, color: "text-blue-600", bg: "bg-blue-100", href: null },
+    { title: "일반 사용자 계정", value: `${totalGeneralUsers}명`, icon: UserCog, color: "text-amber-600", bg: "bg-amber-100", href: null },
+    { title: "누적 견적 건수", value: `${totalEstimates}건`, icon: FileText, color: "text-emerald-600", bg: "bg-emerald-100", href: null },
+    { title: "잠재 매출액 (최대)", value: `${new Intl.NumberFormat('ko-KR').format(totalRevenuePotential)}원`, icon: TrendingUp, color: "text-indigo-600", bg: "bg-indigo-100", href: null },
+    { title: "가입 승인 대기", value: `${pendingCompanies}건`, icon: pendingCompanies > 0 ? Clock : Building2, color: pendingCompanies > 0 ? "text-amber-600" : "text-slate-400", bg: pendingCompanies > 0 ? "bg-amber-100" : "bg-slate-100", href: "/admin/companies" },
   ];
 
   return (
@@ -45,17 +48,20 @@ export default async function AdminDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {statsCards.map((stat, i) => {
           const Icon = stat.icon;
-          return (
-            <div key={i} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex items-center gap-4 hover:shadow-md transition-shadow">
+          const isPending = stat.href && pendingCompanies > 0;
+          const card = (
+            <div key={i} className={`bg-white rounded-2xl p-6 shadow-sm border flex items-center gap-4 hover:shadow-md transition-shadow ${isPending ? 'border-amber-300 ring-1 ring-amber-200' : 'border-slate-200'}`}>
               <div className={`w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0 ${stat.bg}`}>
                 <Icon size={24} className={stat.color} />
               </div>
               <div>
                 <p className="text-sm font-medium text-slate-500">{stat.title}</p>
-                <h3 className="text-2xl font-bold text-slate-800 mt-1">{stat.value}</h3>
+                <h3 className={`text-2xl font-bold mt-1 ${isPending ? 'text-amber-600' : 'text-slate-800'}`}>{stat.value}</h3>
               </div>
+              {isPending && <span className="ml-auto text-xs font-bold text-amber-600 bg-amber-100 px-2 py-1 rounded-full animate-pulse">처리 필요</span>}
             </div>
           );
+          return stat.href ? <Link key={i} href={stat.href}>{card}</Link> : card;
         })}
       </div>
 

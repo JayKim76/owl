@@ -5,7 +5,8 @@ import { hashPassword, verifyPassword } from '@/lib/password';
 function getRedirectUrl(request: Request, pathname: string) {
   const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'www.owl-leak.kr';
   const forwardedProto = request.headers.get('x-forwarded-proto');
-  const protocol = forwardedProto || (host.includes('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https');
+  const protocol = forwardedProto || 
+    (host.includes('localhost') || host.match(/^(127\.|192\.|10\.|172\.)/) ? 'http' : 'https');
 
   return new URL(pathname, `${protocol}://${host}`);
 }
@@ -104,6 +105,9 @@ async function createUserLoginResponse(request: Request) {
     path: '/',
     maxAge: 60 * 60 * 24 * 7,
   });
+
+  response.cookies.delete('admin_session');
+  response.cookies.delete('company_session');
 
   return response;
 }

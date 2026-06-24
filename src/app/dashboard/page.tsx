@@ -1,4 +1,5 @@
-import { Wrench, PhoneCall, CalendarClock, Briefcase, FileText, ChevronRight, Settings, Users, ArrowRight, UserPlus, Sparkles, ListChecks } from "lucide-react";
+import { Wrench, PhoneCall, CalendarClock, Briefcase, FileText, ChevronRight, Users, ArrowRight, UserPlus, Sparkles, ListChecks } from "lucide-react";
+import SettingsDropdown from "@/components/SettingsDropdown";
 import Link from "next/link";
 import Image from "next/image";
 import prisma from "@/lib/prisma";
@@ -95,9 +96,7 @@ export default async function UserDashboard() {
               <p className="text-xs text-blue-100">부엉이누수탐지랩 현장 업무 계정</p>
             </div>
           </div>
-          <button className="p-2 rounded-full hover:bg-blue-800 transition-colors">
-            <Settings size={20} />
-          </button>
+          <SettingsDropdown />
         </header>
 
         {/* Content Body */}

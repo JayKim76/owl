@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, FileText, ArrowLeft, Bell, LogOut, UserCog } from "lucide-react";
+import { LayoutDashboard, Users, FileText, ArrowLeft, Bell, LogOut, UserCog, Building2 } from "lucide-react";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -10,6 +10,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const navItems = [
     { name: "대시보드 홈", href: "/admin", icon: LayoutDashboard },
     { name: "업체관리", href: "/admin/users", icon: UserCog },
+    { name: "가입 신청 관리", href: "/admin/companies", icon: Building2 },
     { name: "견적 관리", href: "/admin/estimates", icon: FileText },
     { name: "고객 관리", href: "/admin/customers", icon: Users },
   ];

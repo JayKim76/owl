@@ -3,7 +3,8 @@ import { NextResponse } from 'next/server';
 function getRedirectUrl(request: Request, pathname: string) {
   const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'www.owl-leak.kr';
   const forwardedProto = request.headers.get('x-forwarded-proto');
-  const protocol = forwardedProto || (host.includes('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https');
+  const protocol = forwardedProto || 
+    (host.includes('localhost') || host.match(/^(127\.|192\.|10\.|172\.)/) ? 'http' : 'https');
 
   return new URL(pathname, `${protocol}://${host}`);
 }
@@ -20,7 +21,7 @@ export async function POST(request: Request) {
     ? NextResponse.redirect(getRedirectUrl(request, '/login'), { status: 303 })
     : NextResponse.json({ success: true });
 
-  for (const name of ['admin_session', 'user_session']) {
+  for (const name of ['admin_session', 'user_session', 'company_session']) {
     response.cookies.set({
       name,
       value: '',

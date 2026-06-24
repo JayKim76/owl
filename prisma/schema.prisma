@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model Customer {
@@ -36,6 +37,8 @@ model Partner {
   updatedAt     DateTime     @updatedAt
   tasks         Task[]
   generalUser   GeneralUser?
+  createdById   Int?
+  createdBy     GeneralUser? @relation("PartnerCreator", fields: [createdById], references: [id])
 }
 
 model Estimate {
@@ -95,6 +98,8 @@ model Task {
   
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+  createdById  Int?
+  createdBy    GeneralUser? @relation("TaskCreator", fields: [createdById], references: [id])
 }
 
 model AdminUser {
@@ -104,6 +109,50 @@ model AdminUser {
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+model Company {
+  id           Int           @id @default(autoincrement())
+  name         String
+  ownerName    String
+  phone        String        @unique
+  email        String?       @unique
+  passwordHash String
+  isActive     Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  subscription Subscription?
+}
+
+model Subscription {
+  id        Int      @id @default(autoincrement())
+  companyId Int      @unique
+  company   Company  @relation(fields: [companyId], references: [id])
+  plan      String   @default("trial")
+  status    String   @default("pending")
+  startDate DateTime?
+  endDate   DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model EstimateTemplate {
+  id           Int      @id @default(autoincrement())
+  name         String
+  description  String?
+  fileUrl      String?
+  fieldMapping Json?
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model CostSetting {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     Int
+  label     String
+  updatedAt DateTime @updatedAt
 }
 
 model GeneralUser {
@@ -118,4 +167,6 @@ model GeneralUser {
   partner      Partner? @relation(fields: [partnerId], references: [id], onDelete: SetNull)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  createdPartners Partner[] @relation("PartnerCreator")
+  createdTasks    Task[]    @relation("TaskCreator")
 }

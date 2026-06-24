@@ -12,6 +12,31 @@ export async function POST(request: Request) {
     // AI 딥러닝 비전 분석 시뮬레이션을 위한 지연 적용 (2.5초)
     await new Promise((resolve) => setTimeout(resolve, 2500));
 
+    // 사진이 누수 관련 사진인지 판단하는 비전 검증 검사 시뮬레이션
+    // 실서비스에서는 컴퓨터 비전 모델을 거치지만, 여기선 모사로 구현합니다.
+    // 1) 샘플용 SVG 누수 사진(SAMPLE_LEAK_SVG)은 통과시킵니다.
+    // 2) 일반 업로드 파일의 경우, 시뮬레이션을 위해 base64 문자열의 특정 성질이나
+    //    데모를 위해 누수 키워드나 메타 정보, 혹은 임의의 텍스트가 아닌 경우 필터링합니다.
+    //    여기서는 텍스트 데이터 내에 누수 힌트가 들어있거나 파일이 너무 작거나 단순한 경우 누수가 아니라고 판별합니다.
+    const isSvgSample = image && image.startsWith('data:image/svg+xml');
+    
+    // 사용자가 직접 촬영/업로드한 사진의 누수 여부를 가려내기 위한 Mock 검증 규칙
+    // 실제 카메라로 찍은 유효한 이미지(길이가 충분히 긴 base64 이미지 데이터)이거나 특정 키워드가 포함되었는지 확인
+    // 여기서는 base64 데이터의 길이나 특정 형식이 유효한지 검증하고, 만약 누수와 무관한 단순 더미 텍스트/아무 파일 등이면 오류 처리합니다.
+    // 또한 테스트 편의를 위해 'data:image/'로 시작하는 일반적인 이미지 유형에 대해서는 기본적으로 판독하되,
+    // 데이터의 해상도가 매우 낮거나 비정상적인 데이터 구조인 경우 비누수 판정을 시뮬레이션합니다.
+    const isValidImage = image && (image.startsWith('data:image/jpeg') || image.startsWith('data:image/png') || image.startsWith('data:image/webp') || isSvgSample);
+    
+    // 시뮬레이션: 만약 사용자가 'test-non-leak' 같은 임의의 무관한 사진 데이터를 전송했거나 이미지 형식이 아닌 경우 누수 사진이 아님을 판정
+    const isLeakPhoto = isValidImage && !image.includes('test-non-leak') && image.length > 500;
+
+    if (!isLeakPhoto) {
+      return NextResponse.json({
+        success: false,
+        error: '올바른 누수 의심 사진이 아닙니다. 벽면, 천장, 바닥 등 누수 흔적(젖음, 물방울, 변색 등)이 있는 사진을 선명하게 촬영하여 업로드해주세요.'
+      }, { status: 400 });
+    }
+
     let result;
 
     if (clickY < 35) {

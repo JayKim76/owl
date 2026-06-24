@@ -264,11 +264,11 @@ export default function AIDiagnosisPage() {
           setIsDiagnosing(false);
         }, 800);
       } else {
-        throw new Error(data.error || '진단 실패');
+        throw new Error(data.error || '올바른 누수 의심 사진이 아닙니다. 벽면, 천장, 바닥 등 누수 흔적이 있는 사진을 업로드해주세요.');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      showToast('AI 진단 도중 문제가 발생했습니다.');
+      showToast(error.message || 'AI 진단 도중 문제가 발생했습니다.');
       setStep('target');
       setIsDiagnosing(false);
     }

@@ -1,22 +1,6 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
-
-async function getSessionInfo() {
-  const cookieStore = await cookies();
-  const adminSession = cookieStore.get('admin_session')?.value;
-  const userSession = cookieStore.get('user_session')?.value;
-
-  if (adminSession) {
-    return { isAdmin: true, userId: null };
-  }
-
-  if (userSession && userSession.startsWith('general:')) {
-    return { isAdmin: false, userId: parseInt(userSession.split(':')[1], 10) };
-  }
-
-  return { isAdmin: false, userId: null };
-}
+import { getSessionInfo } from "@/lib/session";
 
 export async function GET() {
   try {

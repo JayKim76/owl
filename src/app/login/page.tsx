@@ -1,5 +1,6 @@
-import { ArrowRight, Lock, ShieldAlert, ShieldCheck, UserRound, Sparkles, CheckCircle2 } from "lucide-react";
+import { Lock, Sparkles, CheckCircle2, ArrowRight } from "lucide-react";
 import Link from "next/link";
+import LoginForm from "@/components/LoginForm";
 
 export default async function LoginPage({
   searchParams,
@@ -66,93 +67,9 @@ export default async function LoginPage({
           <p className="text-slate-400 text-sm mt-2">사용 목적에 맞는 접속 방식을 선택해주세요.</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {/* 통합 사용자 로그인 */}
-          <section className="bg-white/10 backdrop-blur-xl border border-emerald-400/30 p-7 rounded-3xl shadow-2xl">
-            <div className="flex items-start gap-4 mb-6">
-              <div className="w-14 h-14 bg-emerald-500/20 border border-emerald-400/30 rounded-2xl flex items-center justify-center shrink-0">
-                <UserRound size={28} className="text-emerald-300" />
-              </div>
-              <div>
-                <p className="text-xs font-bold text-emerald-300 tracking-widest uppercase mb-1">USER / COMPANY</p>
-                <h2 className="text-2xl font-bold text-white">사용자 로그인</h2>
-                <p className="text-slate-400 text-sm mt-2 leading-6">
-                  현장 사용자는 비밀번호만, 가입 업체는 연락처와 비밀번호를 함께 입력하세요.
-                </p>
-              </div>
-            </div>
-
-            <form action="/api/auth/unified-login" method="post" className="space-y-3">
-              <input
-                name="phone"
-                type="tel"
-                placeholder="연락처 (업체 로그인 시 입력)"
-                className="w-full bg-slate-800/50 border border-slate-700 text-white px-5 py-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all placeholder:text-slate-500"
-                autoComplete="tel"
-              />
-              <input
-                name="password"
-                type="password"
-                placeholder="비밀번호 입력"
-                className="w-full bg-slate-800/50 border border-slate-700 text-white px-5 py-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all placeholder:text-slate-500"
-                autoComplete="current-password"
-                required
-              />
-              <button
-                type="submit"
-                className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-emerald-500/25 active:scale-[0.98]"
-              >
-                로그인 <ArrowRight size={20} />
-              </button>
-            </form>
-
-            <p className="mt-4 text-center text-slate-600 text-xs">
-              아직 계정이 없으신가요?{" "}
-              <Link href="/register" className="text-emerald-400 hover:text-emerald-300 font-medium">
-                무료 체험 신청
-              </Link>
-            </p>
-          </section>
-
-          {/* 관리자 로그인 */}
-          <section className="bg-white/10 backdrop-blur-xl border border-blue-400/30 p-7 rounded-3xl shadow-2xl">
-            <div className="flex items-start gap-4 mb-6">
-              <div className="w-14 h-14 bg-blue-600/20 border border-blue-500/30 rounded-2xl flex items-center justify-center shrink-0">
-                <ShieldCheck size={28} className="text-blue-300" />
-              </div>
-              <div>
-                <p className="text-xs font-bold text-blue-300 tracking-widest uppercase mb-1">ADMIN</p>
-                <h2 className="text-2xl font-bold text-white">관리자 로그인</h2>
-                <p className="text-slate-400 text-sm mt-2 leading-6">
-                  관리자 대시보드에서 견적·고객·사용자 계정을 관리합니다.
-                </p>
-              </div>
-            </div>
-
-            <form action="/api/auth/login" method="post" className="space-y-3">
-              <input
-                name="password"
-                type="password"
-                placeholder="관리자 비밀번호 입력"
-                className="w-full bg-slate-800/50 border border-slate-700 text-white px-5 py-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all placeholder:text-slate-500"
-                autoComplete="current-password"
-                required
-              />
-              <button
-                type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-blue-600/25 active:scale-[0.98]"
-              >
-                관리자 로그인 <ArrowRight size={20} />
-              </button>
-            </form>
-          </section>
+        <div className="max-w-md mx-auto">
+          <LoginForm errorMessage={errorMessage} />
         </div>
-
-        {errorMessage && (
-          <p className="mt-5 bg-rose-500/10 border border-rose-400/30 text-rose-300 text-sm px-4 py-3 rounded-2xl flex items-center justify-center gap-2 animate-in slide-in-from-top-1">
-            <ShieldAlert size={16} /> {errorMessage}
-          </p>
-        )}
 
         {/* 구독 섹션 구분선 */}
         <div className="mt-12 mb-8 flex items-center gap-4">

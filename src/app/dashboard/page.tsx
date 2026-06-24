@@ -1,17 +1,37 @@
-import { Wrench, PhoneCall, CalendarClock, Briefcase, FileText, ChevronRight, Users, ArrowRight, UserPlus, Sparkles, ListChecks } from "lucide-react";
+import { Wrench, PhoneCall, CalendarClock, Briefcase, FileText, ChevronRight, Users, ArrowRight, UserPlus, Sparkles, ListChecks, ShieldCheck } from "lucide-react";
 import SettingsDropdown from "@/components/SettingsDropdown";
 import Link from "next/link";
 import Image from "next/image";
 import prisma from "@/lib/prisma";
+import { getSessionInfo } from "@/lib/session";
 
 export default async function UserDashboard() {
+  const session = await getSessionInfo();
+  const isAdmin = session.role === "admin";
+
+  // 관리자는 전체 데이터, 일반 사용자는 본인이 등록한 자료만, 업체/비로그인은
+  // 아직 소유권 모델이 없으므로 절대 존재하지 않는 id로 필터링해 빈 결과를 반환한다.
+  const ownerFilter =
+    session.role === "admin"
+      ? {}
+      : session.role === "general"
+        ? { createdById: session.userId }
+        : { id: -1 };
+
   // Fetch real data
   const inProgressTasksCount = await prisma.task.count({
-    where: { status: "진행중" },
+    where: { status: "진행중", ...ownerFilter },
   });
 
   const urgentEstimatesCount = await prisma.estimate.count({
-    where: { urgency: { contains: "당일" } },
+    where: {
+      urgency: { contains: "당일" },
+      ...(session.role === "general"
+        ? { task: { createdById: session.userId } }
+        : session.role === "admin"
+          ? {}
+          : { id: -1 }),
+    },
   });
 
   // Date calculations for the weekly calendar
@@ -46,6 +66,7 @@ export default async function UserDashboard() {
         gte: startOfWeek,
         lte: endOfWeek,
       },
+      ...ownerFilter,
     },
   });
 
@@ -69,8 +90,9 @@ export default async function UserDashboard() {
 
   // Fetch upcoming tasks for the list below the calendar (3 most recent from now)
   const upcomingTasks = await prisma.task.findMany({
-    where: { 
-      scheduledDate: { gte: new Date() } 
+    where: {
+      scheduledDate: { gte: new Date() },
+      ...ownerFilter,
     },
     orderBy: { scheduledDate: 'asc' },
     take: 3,
@@ -92,11 +114,26 @@ export default async function UserDashboard() {
               />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">일반 사용자 대시보드</h1>
-              <p className="text-xs text-blue-100">부엉이누수탐지랩 현장 업무 계정</p>
+              <h1 className="text-xl font-bold tracking-tight">
+                {isAdmin ? "관리자 대시보드" : "일반 사용자 대시보드"}
+              </h1>
+              <p className="text-xs text-blue-100">
+                {isAdmin ? "전체 데이터 보기" : "부엉이누수탐지랩 현장 업무 계정"}
+              </p>
             </div>
           </div>
-          <SettingsDropdown />
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className="flex items-center gap-1.5 text-xs font-semibold bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-xl transition-colors border border-white/20"
+              >
+                <ShieldCheck size={14} />
+                관리자 패널
+              </Link>
+            )}
+            <SettingsDropdown />
+          </div>
         </header>
 
         {/* Content Body */}

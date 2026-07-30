@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyPassword, hashPassword } from '@/lib/password';
 
+import { createSessionToken } from '@/lib/session';
+
 function getRedirectUrl(request: Request, pathname: string) {
   const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'localhost:3000';
   const proto = request.headers.get('x-forwarded-proto') || 
@@ -67,11 +69,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '관리자 승인 대기 중입니다. 승인 후 서비스를 이용하실 수 있습니다.' }, { status: 403 });
     }
 
+    const token = await createSessionToken({ role: 'company', companyId: company.id });
+
     const response = redirect
       ? NextResponse.redirect(getRedirectUrl(request, '/dashboard'), { status: 303 })
-      : NextResponse.json({ success: true, role: 'company', redirectTo: '/dashboard', name: company.name });
+      : NextResponse.json({ success: true, role: 'company', redirectTo: '/dashboard', name: company.name, token });
 
-    response.cookies.set({ name: 'company_session', value: `company:${company.id}`, httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 7 });
+    response.cookies.set({ name: 'company_session', value: token, httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 7 });
     response.cookies.delete('admin_session');
     response.cookies.delete('user_session');
     return response;
@@ -90,11 +94,13 @@ export async function POST(request: Request) {
 
   await prisma.generalUser.update({ where: { id: matched.id }, data: { lastLogin: new Date() } });
 
+  const token = await createSessionToken({ role: 'general', userId: matched.id });
+
   const response = redirect
     ? NextResponse.redirect(getRedirectUrl(request, '/dashboard'), { status: 303 })
-    : NextResponse.json({ success: true, role: 'user', redirectTo: '/dashboard', name: matched.name });
+    : NextResponse.json({ success: true, role: 'user', redirectTo: '/dashboard', name: matched.name, token });
 
-  response.cookies.set({ name: 'user_session', value: `general:${matched.id}`, httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 7 });
+  response.cookies.set({ name: 'user_session', value: token, httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 7 });
   response.cookies.delete('admin_session');
   response.cookies.delete('company_session');
   return response;

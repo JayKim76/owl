@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { SignJWT } from 'jose';
 import prisma from '@/lib/prisma';
 import { verifyPassword } from '@/lib/password';
+import { createSessionToken } from '@/lib/session';
 
 export const runtime = 'nodejs';
 
@@ -51,13 +51,7 @@ export async function POST(request: Request) {
     // Allow fallback ADMIN_PASSWORD to act as a master password for recovery, 
     // even if a database admin row already exists.
     if (isDbPasswordValid || password === adminPassword) {
-      // Create JWT token for mobile apps
-      const encoder = new TextEncoder();
-      const token = await new SignJWT({ role: 'admin' })
-        .setProtectedHeader({ alg: 'HS256' })
-        .setIssuedAt()
-        .setExpirationTime('7d')
-        .sign(encoder.encode(jwtSecret));
+      const token = await createSessionToken({ role: 'admin' });
 
       const response = shouldRedirect
         ? NextResponse.redirect(getRedirectUrl(request, '/admin'), { status: 303 })

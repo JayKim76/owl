@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyPassword } from '@/lib/password';
+import { createSessionToken } from '@/lib/session';
 
 function getRedirectUrl(request: Request, pathname: string) {
   const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'localhost:3000';
@@ -52,13 +53,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: '관리자 승인 대기 중입니다. 승인 후 서비스를 이용하실 수 있습니다.' }, { status: 403 });
   }
 
+  const token = await createSessionToken({ role: 'company', companyId: company.id });
+
   const response = wantsRedirect
     ? NextResponse.redirect(getRedirectUrl(request, '/dashboard'), { status: 303 })
-    : NextResponse.json({ success: true, role: 'company', redirectTo: '/dashboard', company: { id: company.id, name: company.name } });
+    : NextResponse.json({ success: true, role: 'company', redirectTo: '/dashboard', token, company: { id: company.id, name: company.name } });
 
   response.cookies.set({
     name: 'company_session',
-    value: `company:${company.id}`,
+    value: token,
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',

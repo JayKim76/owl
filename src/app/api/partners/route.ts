@@ -276,6 +276,16 @@ export async function PUT(request: Request) {
       });
 
       if (isAdmin) {
+        const updateData: Record<string, unknown> = {
+          name: manager,
+          memo: [companyName, type, region, memo].filter(Boolean).join(' / ') || null,
+          isActive: updatedPartner.status !== 'inactive',
+          partnerId: updatedPartner.id,
+        };
+        if (password) {
+          updateData.passwordHash = hashPassword(password);
+        }
+
         await tx.generalUser.upsert({
           where: { phone },
           create: {
@@ -286,13 +296,7 @@ export async function PUT(request: Request) {
             isActive: updatedPartner.status !== 'inactive',
             partnerId: updatedPartner.id,
           },
-          update: {
-            name: manager,
-            ...(password ? { passwordHash: hashPassword(password) } : {}),
-            memo: [companyName, type, region, memo].filter(Boolean).join(' / ') || null,
-            isActive: updatedPartner.status !== 'inactive',
-            partnerId: updatedPartner.id,
-          },
+          update: updateData,
         });
       }
 

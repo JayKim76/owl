@@ -7,43 +7,27 @@ import Link from 'next/link';
 
 const plans = [
   {
-    id: 'trial',
-    name: '체험판',
-    badge: '14일 무료',
-    price: '₩0',
-    period: '/월',
-    features: ['고객 등록 최대 50건', '견적서 작성', '협력사 3개'],
-    color: 'border-slate-500/60',
-    selectedColor: 'border-slate-400 bg-slate-700/30',
-    badgeColor: 'bg-slate-600',
-  },
-  {
-    id: 'basic',
-    name: 'Basic',
-    badge: '인기',
-    price: '₩49,000',
-    period: '/월',
-    features: ['고객 등록 무제한', '견적서 양식 커스텀', '협력사 무제한', '카카오 알림톡'],
-    color: 'border-emerald-500/40',
-    selectedColor: 'border-emerald-400 bg-emerald-900/20',
-    badgeColor: 'bg-emerald-600',
-  },
-  {
-    id: 'pro',
-    name: 'Pro',
-    badge: '최고 기능',
+    id: 'general',
+    name: '일반 사용자',
+    badge: '추천 플랜',
     price: '₩99,000',
     period: '/월',
-    features: ['Basic 모든 기능', 'AI 누수 진단', '다중 사용자 계정', '우선 고객 지원'],
-    color: 'border-blue-500/40',
-    selectedColor: 'border-blue-400 bg-blue-900/20',
-    badgeColor: 'bg-blue-600',
+    features: [
+      '고객 및 현장 무제한 등록',
+      'AI 누수 정밀 진단',
+      '견적서 산출 및 양식 커스텀',
+      '탐지절차 체크리스트 & 현장 사진 관리',
+      '협력사 등록 및 관리',
+    ],
+    color: 'border-emerald-500/60',
+    selectedColor: 'border-emerald-400 bg-emerald-900/30',
+    badgeColor: 'bg-emerald-600',
   },
 ];
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [selectedPlan, setSelectedPlan] = useState('trial');
+  const [selectedPlan, setSelectedPlan] = useState('general');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);

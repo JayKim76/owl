@@ -1,37 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-// GET: list all companies with subscription AND pending partners
+// GET: list all companies with subscription AND all partners
 export async function GET() {
-  const [companies, pendingPartners] = await Promise.all([
+  const [companies, partners] = await Promise.all([
     prisma.company.findMany({
       orderBy: [{ isActive: 'asc' }, { createdAt: 'desc' }],
       include: { subscription: true },
     }),
     prisma.partner.findMany({
-      where: { status: 'pending' },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
     }),
   ]);
 
-  // Convert pending partners into company-like items so admin can review and approve them in the same UI
-  const partnerItems = pendingPartners.map((p) => ({
-    id: `partner_${p.id}`,
-    isPartner: true,
-    partnerId: p.id,
-    name: p.companyName,
-    ownerName: p.contactName || p.companyName,
-    phone: p.phone,
-    email: p.email || null,
-    isActive: false,
-    createdAt: p.createdAt,
-    subscription: {
-      plan: p.specialty || '협력사',
-      status: 'pending',
-      startDate: null,
-      endDate: null,
-    },
-  }));
+  // Map partners into unified item format for admin view
+  const partnerItems = partners.map((p) => {
+    let subStatus = 'pending';
+    if (p.status === 'active') subStatus = 'active';
+    else if (p.status === 'inactive') subStatus = 'expired';
+
+    return {
+      id: `partner_${p.id}`,
+      isPartner: true,
+      partnerId: p.id,
+      name: p.companyName,
+      ownerName: p.contactName || p.companyName,
+      phone: p.phone,
+      email: p.email || null,
+      isActive: p.status === 'active',
+      createdAt: p.createdAt,
+      subscription: {
+        plan: p.specialty || '협력사',
+        status: subStatus,
+        startDate: p.createdAt,
+        endDate: null,
+      },
+    };
+  });
 
   return NextResponse.json([...partnerItems, ...companies]);
 }
@@ -65,7 +70,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true, message: `'${partner.companyName}' 협력사 승인 완료` });
       }
 
-      if (action === 'reject') {
+      if (action === 'reject' || action === 'deactivate') {
         const partner = await prisma.partner.update({
           where: { id: pId },
           data: { status: 'inactive' },
@@ -77,7 +82,7 @@ export async function POST(request: NextRequest) {
           data: { isActive: false },
         });
 
-        return NextResponse.json({ success: true, message: `'${partner.companyName}' 협력사 거절 완료` });
+        return NextResponse.json({ success: true, message: `'${partner.companyName}' 협력사 ${action === 'deactivate' ? '비활성화' : '거절'} 완료` });
       }
 
       if (action === 'delete') {

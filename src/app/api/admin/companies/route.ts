@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-// GET: list all companies with subscription AND all partners
+// GET: list all companies with subscription AND all partners (deduplicated by phone)
 export async function GET() {
   const [companies, partners] = await Promise.all([
     prisma.company.findMany({
@@ -13,30 +13,34 @@ export async function GET() {
     }),
   ]);
 
-  // Map partners into unified item format for admin view
-  const partnerItems = partners.map((p) => {
-    let subStatus = 'pending';
-    if (p.status === 'active') subStatus = 'active';
-    else if (p.status === 'inactive') subStatus = 'expired';
+  const companyPhones = new Set(companies.map((c) => c.phone));
 
-    return {
-      id: `partner_${p.id}`,
-      isPartner: true,
-      partnerId: p.id,
-      name: p.companyName,
-      ownerName: p.contactName || p.companyName,
-      phone: p.phone,
-      email: p.email || null,
-      isActive: p.status === 'active',
-      createdAt: p.createdAt,
-      subscription: {
-        plan: p.specialty || '협력사',
-        status: subStatus,
-        startDate: p.createdAt,
-        endDate: null,
-      },
-    };
-  });
+  // Map partners into unified item format, skipping any partner whose phone is already in Company
+  const partnerItems = partners
+    .filter((p) => !companyPhones.has(p.phone))
+    .map((p) => {
+      let subStatus = 'pending';
+      if (p.status === 'active') subStatus = 'active';
+      else if (p.status === 'inactive') subStatus = 'expired';
+
+      return {
+        id: `partner_${p.id}`,
+        isPartner: true,
+        partnerId: p.id,
+        name: p.companyName,
+        ownerName: p.contactName || p.companyName,
+        phone: p.phone,
+        email: p.email || null,
+        isActive: p.status === 'active',
+        createdAt: p.createdAt,
+        subscription: {
+          plan: p.specialty || '협력사',
+          status: subStatus,
+          startDate: p.createdAt,
+          endDate: null,
+        },
+      };
+    });
 
   return NextResponse.json([...partnerItems, ...companies]);
 }

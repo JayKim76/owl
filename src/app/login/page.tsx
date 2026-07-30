@@ -11,19 +11,31 @@ export default async function LoginPage({
 
   const plans = [
     {
-      name: "일반 사용자",
-      badge: "단일 플랜",
-      price: "₩99,000",
+      name: "체험판",
+      badge: "14일 무료",
+      price: "₩0",
+      period: "/월",
+      color: "from-slate-600 to-slate-700",
+      border: "border-slate-500/40",
+      features: ["고객 등록 최대 50건", "견적서 작성", "협력사 3개"],
+    },
+    {
+      name: "Basic",
+      badge: "인기",
+      price: "₩49,000",
       period: "/월",
       color: "from-emerald-600 to-teal-700",
       border: "border-emerald-400/50",
-      features: [
-        "고객 및 현장 무제한 등록",
-        "AI 누수 정밀 진단",
-        "견적서 산출 및 양식 커스텀",
-        "탐지절차 체크리스트 & 현장 사진 관리",
-        "협력사 등록 및 관리",
-      ],
+      features: ["고객 등록 무제한", "견적서 양식 커스텀", "협력사 무제한", "카카오 알림톡"],
+    },
+    {
+      name: "Pro",
+      badge: "최고 기능",
+      price: "₩99,000",
+      period: "/월",
+      color: "from-blue-600 to-indigo-700",
+      border: "border-blue-400/50",
+      features: ["Basic 모든 기능", "AI 누수 진단", "다중 사용자 계정", "우선 고객 지원"],
     },
   ];
 
@@ -70,12 +82,12 @@ export default async function LoginPage({
           <div className="flex-1 h-px bg-slate-700"></div>
         </div>
 
-        {/* 구독 플랜 카드 (일반 사용자 단일 플랜) */}
-        <div className="max-w-md mx-auto mb-6">
+        {/* 구독 플랜 카드 */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           {plans.map((plan) => (
             <div
               key={plan.name}
-              className={`bg-white/5 backdrop-blur-xl border ${plan.border} rounded-2xl p-6 flex flex-col gap-4 shadow-xl`}
+              className={`bg-white/5 backdrop-blur-xl border ${plan.border} rounded-2xl p-6 flex flex-col gap-4`}
             >
               <div className="flex items-center justify-between">
                 <h3 className="text-white font-bold text-lg">{plan.name}</h3>
@@ -84,13 +96,13 @@ export default async function LoginPage({
                 </span>
               </div>
               <div className="flex items-baseline gap-1">
-                <span className="text-3xl font-extrabold text-white">{plan.price}</span>
+                <span className="text-2xl font-extrabold text-white">{plan.price}</span>
                 <span className="text-slate-400 text-sm">{plan.period}</span>
               </div>
-              <ul className="space-y-2.5 flex-1">
+              <ul className="space-y-2 flex-1">
                 {plan.features.map((f) => (
                   <li key={f} className="flex items-center gap-2 text-slate-300 text-sm">
-                    <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+                    <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
                     {f}
                   </li>
                 ))}
@@ -106,9 +118,10 @@ export default async function LoginPage({
             className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold px-8 py-4 rounded-2xl shadow-lg hover:shadow-emerald-500/30 transition-all active:scale-[0.98]"
           >
             <Sparkles size={18} />
-            구독 및 서비스 신청하기
+            무료 체험 시작하기 (14일)
             <ArrowRight size={18} />
           </Link>
+          <p className="text-slate-500 text-xs mt-3">신용카드 불필요 · 언제든지 취소 가능</p>
         </div>
       </div>
     </div>

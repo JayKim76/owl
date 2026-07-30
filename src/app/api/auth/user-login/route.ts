@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { hashPassword, verifyPassword } from '@/lib/password';
-import { createSessionToken } from '@/lib/session';
 
 function getRedirectUrl(request: Request, pathname: string) {
   const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'www.owl-leak.kr';
@@ -84,14 +83,11 @@ async function createUserLoginResponse(request: Request) {
     data: { lastLogin: new Date() },
   });
 
-  const token = await createSessionToken({ role: 'general', userId: updatedUser.id });
-
   const response = shouldRedirect
     ? NextResponse.redirect(getRedirectUrl(request, '/dashboard'), { status: 303 })
     : NextResponse.json({
         success: true,
         role: 'user',
-        token,
         user: {
           id: updatedUser.id,
           name: updatedUser.name,
@@ -102,7 +98,7 @@ async function createUserLoginResponse(request: Request) {
 
   response.cookies.set({
     name: 'user_session',
-    value: token,
+    value: `general:${updatedUser.id}`,
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',

@@ -24,28 +24,14 @@ async function hasValidAdminSession(request: NextRequest) {
   }
 }
 
-async function hasGeneralUserSession(request: NextRequest) {
+function hasGeneralUserSession(request: NextRequest) {
   const value = request.cookies.get('user_session')?.value;
-  if (!value) return false;
-  try {
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'owl_super_secret_key_2026');
-    const { payload } = await jwtVerify(value, secret);
-    return payload.role === 'general';
-  } catch {
-    return value === 'general' || Boolean(value?.startsWith('general:'));
-  }
+  return value === 'general' || Boolean(value?.startsWith('general:'));
 }
 
-async function hasCompanySession(request: NextRequest) {
+function hasCompanySession(request: NextRequest) {
   const value = request.cookies.get('company_session')?.value;
-  if (!value) return false;
-  try {
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'owl_super_secret_key_2026');
-    const { payload } = await jwtVerify(value, secret);
-    return payload.role === 'company';
-  } catch {
-    return Boolean(value?.startsWith('company:'));
-  }
+  return Boolean(value?.startsWith('company:'));
 }
 
 export async function middleware(request: NextRequest) {
@@ -68,8 +54,8 @@ export async function middleware(request: NextRequest) {
   }
 
   const isAdmin = await hasValidAdminSession(request);
-  const isGeneralUser = await hasGeneralUserSession(request);
-  const isCompany = await hasCompanySession(request);
+  const isGeneralUser = hasGeneralUserSession(request);
+  const isCompany = hasCompanySession(request);
 
   // 관리자 화면은 관리자 로그인만 허용합니다.
   if (path.startsWith('/admin')) {

@@ -169,16 +169,4 @@ model GeneralUser {
   updatedAt    DateTime @updatedAt
   createdPartners Partner[] @relation("PartnerCreator")
   createdTasks    Task[]    @relation("TaskCreator")
-  sitePhotos      SitePhoto[]
-}
-
-model SitePhoto {
-  id          Int      @id @default(autoincrement())
-  title       String
-  storagePath String   // public 디렉토리 기준 상대 경로 (예: /uploads/user_1/2026-06-25/photo.jpg)
-  date        String   // YYYY-MM-DD
-  userId      Int?
-  user        GeneralUser? @relation(fields: [userId], references: [id], onDelete: Cascade)
-  companyId   Int?
-  createdAt   DateTime @default(now())
 }

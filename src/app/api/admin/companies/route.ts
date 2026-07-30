@@ -1,27 +1,95 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-// GET: list all companies with subscription
+// GET: list all companies with subscription AND pending partners
 export async function GET() {
-  const companies = await prisma.company.findMany({
-    orderBy: [{ isActive: 'asc' }, { createdAt: 'desc' }],
-    include: { subscription: true },
-  });
-  return NextResponse.json(companies);
+  const [companies, pendingPartners] = await Promise.all([
+    prisma.company.findMany({
+      orderBy: [{ isActive: 'asc' }, { createdAt: 'desc' }],
+      include: { subscription: true },
+    }),
+    prisma.partner.findMany({
+      where: { status: 'pending' },
+      orderBy: { createdAt: 'desc' },
+    }),
+  ]);
+
+  // Convert pending partners into company-like items so admin can review and approve them in the same UI
+  const partnerItems = pendingPartners.map((p) => ({
+    id: `partner_${p.id}`,
+    isPartner: true,
+    partnerId: p.id,
+    name: p.companyName,
+    ownerName: p.contactName || p.companyName,
+    phone: p.phone,
+    email: p.email || null,
+    isActive: false,
+    createdAt: p.createdAt,
+    subscription: {
+      plan: p.specialty || '협력사',
+      status: 'pending',
+      startDate: null,
+      endDate: null,
+    },
+  }));
+
+  return NextResponse.json([...partnerItems, ...companies]);
 }
 
 // POST: approve | reject | deactivate | delete
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { action, companyId } = body;
+  const { action, companyId, isPartner, partnerId } = body;
 
-  if (!companyId || !action) {
-    return NextResponse.json({ error: 'companyId와 action이 필요합니다.' }, { status: 400 });
+  if ((!companyId && !partnerId) || !action) {
+    return NextResponse.json({ error: 'ID와 action이 필요합니다.' }, { status: 400 });
   }
 
-  const id = Number(companyId);
-
   try {
+    // ── 협력사(Partner) 승인/거절 처리
+    if (isPartner || String(companyId).startsWith('partner_')) {
+      const pId = Number(partnerId || String(companyId).replace('partner_', ''));
+
+      if (action === 'approve') {
+        const partner = await prisma.partner.update({
+          where: { id: pId },
+          data: { status: 'active' },
+        });
+
+        // 연결된 GeneralUser 계정도 활성화
+        await prisma.generalUser.updateMany({
+          where: { partnerId: pId },
+          data: { isActive: true },
+        });
+
+        return NextResponse.json({ success: true, message: `'${partner.companyName}' 협력사 승인 완료` });
+      }
+
+      if (action === 'reject') {
+        const partner = await prisma.partner.update({
+          where: { id: pId },
+          data: { status: 'inactive' },
+        });
+
+        // 연결된 GeneralUser 계정도 비활성화
+        await prisma.generalUser.updateMany({
+          where: { partnerId: pId },
+          data: { isActive: false },
+        });
+
+        return NextResponse.json({ success: true, message: `'${partner.companyName}' 협력사 거절 완료` });
+      }
+
+      if (action === 'delete') {
+        await prisma.generalUser.deleteMany({ where: { partnerId: pId } });
+        await prisma.partner.delete({ where: { id: pId } });
+        return NextResponse.json({ success: true, message: '협력사 삭제 완료' });
+      }
+    }
+
+    // ── 기존 Company 승인/거절 처리
+    const id = Number(companyId);
+
     if (action === 'approve') {
       const plan = body.plan;
       const now = new Date();

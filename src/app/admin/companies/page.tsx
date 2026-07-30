@@ -11,7 +11,9 @@ type Subscription = {
 };
 
 type Company = {
-  id: number;
+  id: number | string;
+  isPartner?: boolean;
+  partnerId?: number;
   name: string;
   ownerName: string;
   phone: string;
@@ -32,7 +34,7 @@ const STATUS_LABEL: Record<string, { label: string; color: string }> = {
 export default function AdminCompaniesPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [actionLoading, setActionLoading] = useState<number | string | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
   const fetchCompanies = useCallback(async () => {
@@ -53,13 +55,19 @@ export default function AdminCompaniesPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const doAction = async (companyId: number, action: string, plan?: string) => {
-    setActionLoading(companyId);
+  const doAction = async (company: Company, action: string, plan?: string) => {
+    setActionLoading(company.id);
     try {
       const res = await fetch('/api/admin/companies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId, action, plan }),
+        body: JSON.stringify({
+          companyId: company.id,
+          isPartner: company.isPartner,
+          partnerId: company.partnerId,
+          action,
+          plan,
+        }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -152,7 +160,7 @@ export default function AdminCompaniesPage() {
                 {/* Actions */}
                 <div className="flex gap-2 shrink-0">
                   <button
-                    onClick={() => doAction(c.id, 'approve', c.subscription?.plan)}
+                    onClick={() => doAction(c, 'approve', c.subscription?.plan)}
                     disabled={actionLoading === c.id}
                     className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white text-sm font-bold px-4 py-2 rounded-xl transition-all"
                   >
@@ -160,7 +168,7 @@ export default function AdminCompaniesPage() {
                     승인
                   </button>
                   <button
-                    onClick={() => doAction(c.id, 'reject')}
+                    onClick={() => doAction(c, 'reject')}
                     disabled={actionLoading === c.id}
                     className="flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 disabled:opacity-50 text-rose-600 text-sm font-bold px-4 py-2 rounded-xl border border-rose-200 transition-all"
                   >
@@ -203,6 +211,7 @@ export default function AdminCompaniesPage() {
                 {companies.map(c => {
                   const st = STATUS_LABEL[c.subscription?.status || 'pending'];
                   const isLoading = actionLoading === c.id;
+                  const planText = PLAN_LABEL[c.subscription?.plan || ''] || c.subscription?.plan || '일반';
                   return (
                     <tr key={c.id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="px-6 py-4">
@@ -216,7 +225,7 @@ export default function AdminCompaniesPage() {
                       <td className="px-6 py-4">
                         <span className="flex items-center gap-1 text-xs text-slate-500">
                           <CreditCard size={12} />
-                          {PLAN_LABEL[c.subscription?.plan || 'trial']}
+                          {planText}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-slate-500 text-xs">
@@ -228,18 +237,18 @@ export default function AdminCompaniesPage() {
                       <td className="px-6 py-4">
                         <div className="flex justify-end gap-2">
                           {c.subscription?.status === 'pending' && (
-                            <button onClick={() => doAction(c.id, 'approve', c.subscription?.plan)} disabled={isLoading}
+                            <button onClick={() => doAction(c, 'approve', c.subscription?.plan)} disabled={isLoading}
                               className="text-xs font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
                               <CheckCircle2 size={12} /> 승인
                             </button>
                           )}
                           {c.isActive && (
-                            <button onClick={() => doAction(c.id, 'deactivate')} disabled={isLoading}
+                            <button onClick={() => doAction(c, 'deactivate')} disabled={isLoading}
                               className="text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
                               <ShieldOff size={12} /> 비활성화
                             </button>
                           )}
-                          <button onClick={() => { if (confirm(`"${c.name}" 업체를 삭제하시겠습니까?`)) doAction(c.id, 'delete'); }} disabled={isLoading}
+                          <button onClick={() => { if (confirm(`"${c.name}" 업체를 삭제하시겠습니까?`)) doAction(c, 'delete'); }} disabled={isLoading}
                             className="text-xs font-bold bg-rose-50 text-rose-600 hover:bg-rose-100 disabled:opacity-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
                             <Trash2 size={12} /> 삭제
                           </button>

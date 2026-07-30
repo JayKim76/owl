@@ -10,19 +10,23 @@ export default async function AdminDashboard() {
     totalCustomers,
     totalGeneralUsers,
     totalEstimates,
-    pendingCompanies,
+    pendingCompaniesCount,
+    pendingPartnersCount,
     recentEstimates
   ] = await Promise.all([
     prisma.customer.count(),
     prisma.generalUser.count(),
     prisma.estimate.count(),
     prisma.subscription.count({ where: { status: 'pending' } }),
+    prisma.partner.count({ where: { status: 'pending' } }),
     prisma.estimate.findMany({
       take: 5,
       orderBy: { createdAt: 'desc' },
       include: { customer: true }
     })
   ]);
+
+  const pendingCompanies = pendingCompaniesCount + pendingPartnersCount;
 
   // Aggregate stats (example: sum of estimated max price)
   const estimatesAgg = await prisma.estimate.aggregate({

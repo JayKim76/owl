@@ -6,6 +6,9 @@ import { Building2, Clock, CheckCircle2, XCircle, ShieldOff, Trash2, RefreshCw, 
 type Subscription = {
   plan: string;
   status: string;
+  billingAmount?: number;
+  billingDay?: number;
+  nextBillingDate?: string | null;
   startDate: string | null;
   endDate: string | null;
 };
@@ -223,15 +226,17 @@ export default function AdminCompaniesPage() {
                       <td className="px-6 py-4 text-slate-600">{c.ownerName}</td>
                       <td className="px-6 py-4 text-slate-600">{c.phone}</td>
                       <td className="px-6 py-4">
-                        <span className="flex items-center gap-1 text-xs text-slate-500">
-                          <CreditCard size={12} />
-                          {planText}
+                        <span className="flex items-center gap-1 text-xs font-semibold text-slate-700">
+                          <CreditCard size={12} className="text-emerald-600" />
+                          ₩{new Intl.NumberFormat('ko-KR').format(c.subscription?.billingAmount || 99000)}/월
                         </span>
                       </td>
                       <td className="px-6 py-4 text-slate-500 text-xs">
-                        {c.subscription?.startDate
-                          ? `${new Date(c.subscription.startDate).toLocaleDateString('ko-KR')} ~ ${new Date(c.subscription.endDate!).toLocaleDateString('ko-KR')}`
-                          : '-'}
+                        {c.subscription?.nextBillingDate
+                          ? `매달 ${c.subscription.billingDay || new Date(c.createdAt).getDate()}일 (다음: ${new Date(c.subscription.nextBillingDate).toLocaleDateString('ko-KR')})`
+                          : c.subscription?.startDate
+                          ? `매달 ${new Date(c.createdAt).getDate()}일 정기결제`
+                          : '승인 대기 중'}
                       </td>
                       <td className="px-6 py-4 text-slate-500">{new Date(c.createdAt).toLocaleDateString('ko-KR')}</td>
                       <td className="px-6 py-4">

@@ -34,8 +34,11 @@ export async function GET() {
         isActive: p.status === 'active',
         createdAt: p.createdAt,
         subscription: {
-          plan: p.specialty || '협력사',
+          plan: p.specialty || '일반 사용자',
           status: subStatus,
+          billingAmount: 99000,
+          billingDay: new Date(p.createdAt).getDate(),
+          nextBillingDate: null,
           startDate: p.createdAt,
           endDate: null,
         },
@@ -103,16 +106,25 @@ export async function POST(request: NextRequest) {
       const plan = body.plan;
       const now = new Date();
       const end = new Date(now);
-      end.setDate(end.getDate() + (plan === 'trial' ? 14 : 30));
+      end.setMonth(end.getMonth() + 1); // 1 month period
+      const nextBilling = new Date(now);
+      nextBilling.setMonth(nextBilling.getMonth() + 1);
 
       await prisma.$transaction([
         prisma.company.update({ where: { id }, data: { isActive: true } }),
         prisma.subscription.update({
           where: { companyId: id },
-          data: { status: 'active', startDate: now, endDate: end },
+          data: {
+            status: 'active',
+            startDate: now,
+            endDate: end,
+            lastBillingDate: now,
+            nextBillingDate: nextBilling,
+            billingDay: now.getDate(),
+          },
         }),
       ]);
-      return NextResponse.json({ success: true, message: '승인 완료' });
+      return NextResponse.json({ success: true, message: '승인 및 구독 결제 개시 완료 (월 99,000원 정기결제 설정)' });
     }
 
     if (action === 'reject') {

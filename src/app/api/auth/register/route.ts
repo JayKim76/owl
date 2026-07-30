@@ -23,7 +23,13 @@ export async function POST(request: NextRequest) {
     }
 
     const passwordHash = hashPassword(password);
-    const validPlan = ['trial', 'basic', 'pro'].includes(plan) ? plan : 'trial';
+    const validPlan = ['trial', 'basic', 'pro', 'general'].includes(plan) ? plan : 'general';
+
+    const now = new Date();
+    const billingDay = now.getDate();
+    // Next billing date is 1 month from now on the same day
+    const nextBillingDate = new Date(now);
+    nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
 
     const company = await prisma.company.create({
       data: {
@@ -37,6 +43,10 @@ export async function POST(request: NextRequest) {
           create: {
             plan: validPlan,
             status: 'pending',
+            billingAmount: 99000,
+            billingCycle: 'monthly',
+            billingDay,
+            nextBillingDate,
           },
         },
       },
